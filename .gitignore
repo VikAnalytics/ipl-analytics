@@ -1,0 +1,11 @@
+.streamlit/secrets.toml
+.venv/
+__pycache__/
+*.pyc
+
+# Local data artifacts (too large / environment specific)
+cricket.db
+data.csv
+
+# OS/editor noise
+.DS_Store
