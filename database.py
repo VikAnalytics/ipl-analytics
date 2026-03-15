@@ -30,6 +30,21 @@ def _build_index_statements(table_name: str, columns: Sequence[str]) -> Iterable
     return tuple(statements)
 
 
+def _load_dataframe(csv_path: str) -> pd.DataFrame:
+    """
+    Load CSV data from a local file path or an HTTP(S) URL.
+    """
+    if csv_path.startswith(("http://", "https://")):
+        return pd.read_csv(csv_path, low_memory=False)
+
+    csv_file = Path(csv_path)
+    if not csv_file.exists():
+        raise FileNotFoundError(
+            f"CSV file not found at '{csv_path}'. Provide a valid local path or HTTP(S) URL."
+        )
+    return pd.read_csv(csv_file, low_memory=False)
+
+
 def _normalize_player_name(name: str) -> str:
     normalized = re.sub(r"[^a-z0-9 ]+", " ", name.lower())
     normalized = re.sub(r"\s+", " ", normalized).strip()
@@ -134,13 +149,7 @@ def init_db(csv_path: str = DEFAULT_CSV_PATH, db_path: str = DEFAULT_DB_PATH) ->
     Reads `csv_path`, writes a flat table named `deliveries`, and creates
     indexes for key cricket analytics dimensions.
     """
-    csv_file = Path(csv_path)
-    if not csv_file.exists():
-        raise FileNotFoundError(
-            f"CSV file not found at '{csv_path}'. Place your dataset as data.csv."
-        )
-
-    dataframe = pd.read_csv(csv_file, low_memory=False)
+    dataframe = _load_dataframe(csv_path)
 
     with sqlite3.connect(db_path) as conn:
         dataframe.to_sql(DELIVERIES_TABLE, conn, if_exists="replace", index=False)

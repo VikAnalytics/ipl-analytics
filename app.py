@@ -276,10 +276,14 @@ with st.sidebar:
     st.caption("For AI mode, `GEMINI_API_KEY` is configured by the app owner.")
 
 try:
-    csv_file = Path(csv_path)
-    if not csv_file.exists():
-        raise FileNotFoundError(f"Dataset not found at `{csv_path}`.")
-    prepare_database(csv_path=csv_path, db_path=db_path, csv_mtime=csv_file.stat().st_mtime)
+    if csv_path.startswith(("http://", "https://")):
+        csv_mtime = 0.0
+    else:
+        csv_file = Path(csv_path)
+        if not csv_file.exists():
+            raise FileNotFoundError(f"Dataset not found at `{csv_path}`.")
+        csv_mtime = csv_file.stat().st_mtime
+    prepare_database(csv_path=csv_path, db_path=db_path, csv_mtime=csv_mtime)
 except Exception as exc:
     st.error(f"Database not ready: {exc}")
 

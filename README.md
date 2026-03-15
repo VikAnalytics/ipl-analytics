@@ -69,6 +69,20 @@ Code layout:
 - Add `GEMINI_API_KEY` in Streamlit app Secrets (never commit it).
 - Dataset and DB are intentionally excluded from Git in this repo template.
 - Configure runtime paths using environment variables if needed:
-  - `CSV_PATH` (default: `data.csv`)
+- `CSV_PATH` (default: `data.csv`, can also be an `https://` CSV URL)
   - `DB_PATH` (default: `cricket.db`)
 
+### One-Click Streamlit Cloud Setup
+
+1. Go to [Streamlit Community Cloud](https://share.streamlit.io/).
+2. Select repo: `VikAnalytics/ipl-analytics`
+3. Main file: `app.py`
+4. In app settings, set:
+   - **Secrets**:
+     - `GEMINI_API_KEY = "your_key"`
+   - **Environment variables**:
+     - `CSV_PATH = "https://<your-public-host>/data.csv"` (recommended for cloud)
+     - optional `DB_PATH = "cricket.db"`
+5. Deploy.
+
+If `CSV_PATH` is a URL, the app loads data directly from that source and builds SQLite on startup.
