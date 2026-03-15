@@ -10,6 +10,15 @@ An AI-powered cricket intelligence workspace for fans, analysts, and strategy le
 - **For stats-first users:** inspect generated SQL, run direct SQL, and validate every number from source data.
 - **For business decision-makers:** convert large, noisy match data into concise, explainable insights fast enough for weekly reviews and sponsor narratives.
 
+## Executive Narrative
+
+- **Data to decision in minutes:** from raw ball-by-ball events to boardroom-ready trend cuts.
+- **Transparent AI:** every natural-language output is backed by inspectable SQL.
+- **Scalable foundation:** lightweight stack (Streamlit + SQLite + Gemini) with clear migration path to managed data warehouses.
+
+In short, this is not just a dashboard. It is a decision-support system where cricket intuition and statistical rigor meet.
+
+
 ## What You Can Ask
 
 - Who are the top death-over wicket takers since 2018?
@@ -63,12 +72,3 @@ Code layout:
   - `CSV_PATH` (default: `data.csv`)
   - `DB_PATH` (default: `cricket.db`)
 
-## Executive Narrative
-
-For an MBB-style audience, this app demonstrates a practical analytics operating model:
-
-- **Data to decision in minutes:** from raw ball-by-ball events to boardroom-ready trend cuts.
-- **Transparent AI:** every natural-language output is backed by inspectable SQL.
-- **Scalable foundation:** lightweight stack (Streamlit + SQLite + Gemini) with clear migration path to managed data warehouses.
-
-In short, this is not just a dashboard. It is a decision-support system where cricket intuition and statistical rigor meet.
