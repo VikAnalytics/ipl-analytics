@@ -31,8 +31,8 @@ def apply_theme() -> None:
           }
           h1, h2, h3, h4, h5, h6, p, div, span, label { color: #f8f9fc !important; }
           .stChatMessage {
-            background: rgba(7, 18, 52, 0.82);
-            border: 1px solid rgba(218, 169, 74, 0.42);
+            background: rgba(7, 18, 52, 0.72);
+            border: 1px solid rgba(218, 169, 74, 0.22);
             border-radius: 14px;
             backdrop-filter: blur(4px);
           }
@@ -60,6 +60,36 @@ def apply_theme() -> None:
           code {
             background-color: rgba(8, 20, 56, 0.96) !important;
             color: #e8ecfa !important;
+          }
+          /* Example prompt chip buttons */
+          .prompt-chip button {
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(218, 169, 74, 0.30) !important;
+            border-radius: 999px !important;
+            color: #d7dff7 !important;
+            font-size: 0.85rem !important;
+            padding: 0.35rem 1rem !important;
+            transition: background 0.15s, border-color 0.15s;
+          }
+          .prompt-chip button:hover {
+            background: rgba(218,169,74,0.12) !important;
+            border-color: rgba(218,169,74,0.65) !important;
+            color: #f4c95d !important;
+          }
+          /* Welcome screen */
+          .welcome-hero {
+            text-align: center;
+            padding: 2.5rem 1rem 1.5rem;
+          }
+          .welcome-hero .title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f8f9fc !important;
+          }
+          .welcome-hero .subtitle {
+            font-size: 0.95rem;
+            color: #9aafd4 !important;
+            margin-top: 0.4rem;
           }
         </style>
         """,
@@ -173,6 +203,11 @@ def render_kpis(stats: dict[str, str]) -> None:
         )
 
 
+def _safe_col_name(name: str) -> str:
+    """Strip characters that Altair misreads as aggregation shorthand."""
+    return re.sub(r"[^a-zA-Z0-9_]", "_", name).strip("_") or "col"
+
+
 def render_chart(df: pd.DataFrame, chart_key: str) -> None:
     if df.empty:
         st.info("No rows returned, so no chart is shown.")
@@ -217,12 +252,20 @@ def render_chart(df: pd.DataFrame, chart_key: str) -> None:
     # (can happen with YoY / grouped queries where SQLite returns object-typed columns).
     chart_df[x_col] = chart_df[x_col].astype(str)
 
+    # Altair interprets parens/slashes in column names as aggregation expressions and
+    # raises ValueError. Rename both columns to safe identifiers for the chart only.
+    safe_x = _safe_col_name(x_col)
+    safe_y = _safe_col_name(y_col)
+    if safe_x == safe_y:
+        safe_y = safe_y + "_value"
+    chart_df = chart_df.rename(columns={x_col: safe_x, y_col: safe_y})
+
     if chart_type == "Bar":
-        st.bar_chart(chart_df.set_index(x_col), use_container_width=True)
+        st.bar_chart(chart_df.set_index(safe_x), width="stretch")
     elif chart_type == "Line":
-        st.line_chart(chart_df.set_index(x_col), use_container_width=True)
+        st.line_chart(chart_df.set_index(safe_x), width="stretch")
     else:
-        st.scatter_chart(chart_df, x=x_col, y=y_col, use_container_width=True)
+        st.scatter_chart(chart_df, x=safe_x, y=safe_y, width="stretch")
 
 
 def render_response(payload: dict, response_key: str) -> None:
@@ -235,7 +278,7 @@ def render_response(payload: dict, response_key: str) -> None:
             st.code(payload["sql"], language="sql")
     if payload.get("data") is not None:
         df = payload["data"]
-        st.dataframe(df, use_container_width=True, height=420)
+        st.dataframe(df, width="stretch", height=420)
         c1, c2, c3 = st.columns(3)
         c1.metric("Rows", f"{len(df):,}")
         c2.metric("Columns", f"{len(df.columns):,}")
@@ -245,10 +288,44 @@ def render_response(payload: dict, response_key: str) -> None:
             data=csv_bytes,
             file_name=f"{response_key}.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
             key=f"{response_key}_download",
         )
         render_chart(df, chart_key=response_key)
+
+
+_EXAMPLE_PROMPTS: list[tuple[str, str]] = [
+    ("🏆", "Top 10 run scorers of all time"),
+    ("🎯", "Best death-over bowlers since 2018"),
+    ("📈", "Virat Kohli's year-on-year run tally"),
+    ("🏟️", "Powerplay economy rate by venue"),
+    ("💥", "Most sixes in a single season"),
+    ("⚔️", "Head-to-head: CSK vs MI matches"),
+]
+
+
+def render_welcome_prompts() -> None:
+    st.markdown(
+        """
+        <div class="welcome-hero">
+          <div style="font-size:2.8rem; line-height:1;">🏏</div>
+          <div class="title" style="margin-top:0.6rem;">IPL AI Analyst</div>
+          <div class="subtitle">Ask any cricket analytics question in plain English</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("")
+    cols = st.columns(2)
+    for i, (icon, text) in enumerate(_EXAMPLE_PROMPTS):
+        col = cols[i % 2]
+        with col:
+            st.markdown('<div class="prompt-chip">', unsafe_allow_html=True)
+            if st.button(f"{icon}  {text}", width="stretch", key=f"_eg_{i}"):
+                st.session_state["_prefill"] = text
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("")
 
 
 def initialize_state() -> None:
@@ -276,6 +353,11 @@ with st.sidebar:
         """
     )
     st.divider()
+    if st.button("🗑️  Clear chat history", width="stretch"):
+        st.session_state.messages = []
+        st.session_state.message_counter = 0
+        st.rerun()
+    st.divider()
     st.caption("Data: IPL ball-by-ball (2008-2025).")
     st.caption("For AI mode, `GEMINI_API_KEY` is configured by the app owner.")
 
@@ -295,56 +377,72 @@ render_kpis(get_dataset_stats(db_path=db_path))
 tab_ai, tab_sql = st.tabs(["AI Analyst", "SQL Studio"])
 
 with tab_ai:
-    st.markdown("### Ask AI Analyst")
-    st.caption("Natural language to SQL using Gemini.")
     if not api_key:
         st.warning("Gemini API key missing. Configure it to use AI Analyst.")
 
-    toolbar_1, toolbar_2 = st.columns([1, 1])
-    if toolbar_1.button("Clear AI Chat", use_container_width=True):
-        st.session_state.messages = []
-        st.session_state.message_counter = 0
-    toolbar_2.caption("Example: Top 10 bowlers by death-over wickets since 2018")
+    # Render full chat history from session state
+    for idx, msg in enumerate(st.session_state.messages):
+        with st.chat_message(msg["role"]):
+            msg_key = msg.get("id", f"history_{idx}")
+            render_response(msg, response_key=msg_key)
 
-    chat_history = st.container(height=520, border=True)
-    with chat_history:
-        for idx, msg in enumerate(st.session_state.messages):
-            with st.chat_message(msg["role"]):
-                msg_key = msg.get("id", f"history_{idx}")
-                render_response(msg, response_key=msg_key)
+    # Show welcome prompts only when there are no messages yet
+    if not st.session_state.messages:
+        render_welcome_prompts()
 
-    question = st.chat_input("Ask a cricket analytics question")
+    # Pick up a question from either the chat input or an example prompt button
+    question = st.chat_input("Ask anything about IPL…")
+    if not question:
+        question = st.session_state.pop("_prefill", None)
+
     if question:
         message_counter = st.session_state.message_counter
-        user_payload = {"id": f"user_{message_counter}", "role": "user", "text": question}
+        user_id = f"user_{message_counter}"
+        assistant_id = f"assistant_{message_counter}"
+
+        user_payload = {"id": user_id, "role": "user", "text": question}
         st.session_state.messages.append(user_payload)
-        assistant_payload: dict = {"id": f"assistant_{message_counter}", "role": "assistant"}
-        try:
-            if not api_key:
-                raise ValueError("Gemini API key missing. Configure secrets and retry.")
 
-            columns = get_table_columns(db_path=db_path)
-            if not columns:
-                raise ValueError("No table schema found. Initialize the database first.")
+        # Show the user bubble immediately (no rerun needed)
+        with st.chat_message("user"):
+            st.markdown(question)
 
-            rewritten_question, alias_notes = resolve_player_aliases(question, db_path=db_path)
-            with st.spinner("Generating SQL..."):
-                sql = generate_sql(user_question=rewritten_question, columns=columns, api_key=api_key)
-            with st.spinner("Executing SQL..."):
-                result_df = execute_query(sql, db_path=db_path)
+        assistant_payload: dict = {"id": assistant_id, "role": "assistant"}
+        with st.chat_message("assistant"):
+            try:
+                if not api_key:
+                    raise ValueError("Gemini API key missing. Configure secrets and retry.")
 
-            assistant_payload["text"] = f"Query executed successfully. Returned **{len(result_df):,}** rows."
-            if alias_notes:
-                assistant_payload["text"] += "\n\nName normalization applied: " + ", ".join(alias_notes[:5])
-            assistant_payload["sql"] = sql
-            assistant_payload["data"] = result_df
-        except Exception as exc:
-            assistant_payload["text"] = "I could not complete that request."
-            assistant_payload["error"] = str(exc)
+                columns = get_table_columns(db_path=db_path)
+                if not columns:
+                    raise ValueError("No table schema found. Initialize the database first.")
+
+                rewritten_question, alias_notes = resolve_player_aliases(question, db_path=db_path)
+
+                with st.status("Thinking…", expanded=False) as status:
+                    st.write("Generating SQL query…")
+                    sql = generate_sql(user_question=rewritten_question, columns=columns, api_key=api_key)
+                    st.write("Running query against database…")
+                    result_df = execute_query(sql, db_path=db_path)
+                    status.update(label="Done", state="complete", expanded=False)
+
+                row_count = len(result_df)
+                summary = f"Here {'is' if row_count == 1 else 'are'} the results — **{row_count:,}** {'row' if row_count == 1 else 'rows'} returned."
+                if alias_notes:
+                    summary += f"\n\n*Name{'s' if len(alias_notes) > 1 else ''} normalized: {', '.join(alias_notes[:5])}*"
+
+                assistant_payload["text"] = summary
+                assistant_payload["sql"] = sql
+                assistant_payload["data"] = result_df
+
+            except Exception as exc:
+                assistant_payload["text"] = "I couldn't complete that request."
+                assistant_payload["error"] = str(exc)
+
+            render_response(assistant_payload, response_key=assistant_id)
 
         st.session_state.messages.append(assistant_payload)
         st.session_state.message_counter = message_counter + 1
-        st.rerun()
 
 with tab_sql:
     st.markdown("### SQL Studio")
@@ -364,7 +462,7 @@ with tab_sql:
     direct_sql = st.text_area("SQL Query", value=st.session_state.direct_sql, height=220)
     st.session_state.direct_sql = direct_sql
     run_col, sample_col = st.columns([1, 1])
-    run_clicked = run_col.button("Run SQL", type="primary", use_container_width=True)
+    run_clicked = run_col.button("Run SQL", type="primary", width="stretch")
     sample_col.code("SELECT batter, SUM(runs_batter) AS runs FROM deliveries GROUP BY batter ORDER BY runs DESC LIMIT 20")
     if run_clicked:
         try:
