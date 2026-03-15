@@ -208,10 +208,14 @@ def render_chart(df: pd.DataFrame, chart_key: str) -> None:
         key=f"{chart_key}_chart_type",
     )
 
-    chart_df = df[[x_col, y_col]].dropna().head(200)
+    chart_df = df[[x_col, y_col]].dropna().head(200).copy()
     if chart_df.empty:
         st.info("No chartable rows after filtering null values.")
         return
+
+    # Flatten x-axis to scalar strings so set_index never receives multi-dimensional data
+    # (can happen with YoY / grouped queries where SQLite returns object-typed columns).
+    chart_df[x_col] = chart_df[x_col].astype(str)
 
     if chart_type == "Bar":
         st.bar_chart(chart_df.set_index(x_col), use_container_width=True)
