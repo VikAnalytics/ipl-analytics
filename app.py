@@ -231,18 +231,24 @@ h1, h2, h3, h4, h5, h6, p, label { color: #e8edf8 !important; }
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def get_api_key() -> str:
+def _get_secret(key: str) -> str:
+    """Read a secret from st.secrets, falling back to env var."""
     try:
-        return st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
-    except Exception:
-        return os.getenv("GEMINI_API_KEY", "")
+        value = st.secrets[key]
+        return str(value) if value else ""
+    except KeyError:
+        pass
+    except Exception as exc:
+        logging.getLogger(__name__).warning("st.secrets access failed: %s", exc)
+    return os.getenv(key, "")
+
+
+def get_api_key() -> str:
+    return _get_secret("GEMINI_API_KEY")
 
 
 def get_database_url() -> str:
-    try:
-        return st.secrets.get("SUPABASE_DATABASE_URL", os.getenv("SUPABASE_DATABASE_URL", ""))
-    except Exception:
-        return os.getenv("SUPABASE_DATABASE_URL", "")
+    return _get_secret("SUPABASE_DATABASE_URL")
 
 
 def _normalize_free_text(text: str) -> str:
@@ -462,7 +468,15 @@ with st.sidebar:
     st.caption("Dataset: IPL ball-by-ball 2008–2025 · Static")
 
 if not database_url:
-    st.error("Supabase not configured. Set `SUPABASE_DATABASE_URL` in `.streamlit/secrets.toml`.")
+    try:
+        available_keys = list(st.secrets.keys())
+    except Exception:
+        available_keys = []
+    st.error(
+        "Supabase not configured — `SUPABASE_DATABASE_URL` is missing or empty.\n\n"
+        f"Secret keys Streamlit can see: `{available_keys}`\n\n"
+        "Add it to `.streamlit/secrets.toml` locally, or the Streamlit Cloud secrets panel."
+    )
     st.stop()
 
 st.title("IPL Analytics")
