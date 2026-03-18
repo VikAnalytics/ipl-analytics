@@ -2,3 +2,5 @@ streamlit
 google-generativeai
 pandas
 psycopg2-binary
+sqlparse
+pytest
