@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import re
-from typing import Sequence
 
 import google.generativeai as genai
 
-TABLE_NAME = "deliveries"
 
-
-def _format_schema(columns: Sequence[str]) -> str:
-    return "\n".join(f"- {column}" for column in columns)
+def _format_schema(schema: dict[str, list[str]]) -> str:
+    lines: list[str] = []
+    for table, columns in schema.items():
+        lines.append(f"Table: {table} ({len(columns)} columns)")
+        for col in columns:
+            lines.append(f"  - {col}")
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def _clean_sql(raw_text: str) -> str:
@@ -20,34 +23,46 @@ def _clean_sql(raw_text: str) -> str:
     return sql
 
 
-def build_prompt(user_question: str, columns: Sequence[str]) -> str:
-    schema = _format_schema(columns)
+def build_prompt(user_question: str, schema: dict[str, list[str]]) -> str:
+    schema_text = _format_schema(schema)
     return f"""
-You are a senior SQLite query generator for cricket analytics.
+You are a senior PostgreSQL query generator for cricket analytics.
 
-Database details:
-- Engine: SQLite
-- Table name: {TABLE_NAME}
-- Exact columns available ({len(columns)} total):
-{schema}
+Database: Supabase (PostgreSQL). Schema below — use only columns that exist.
+
+{schema_text}
+
+Key join relationships:
+- deliveries.match_id → matches.match_id  (season, venue, city, outcome_winner, team1, team2)
+- deliveries.innings_id → innings.innings_id  (team, target_runs)
+- deliveries.batter / bowler → players.player_name  (nationality, batting_style, bowling_style)
+
+Important column notes:
+- over_number is 1-indexed: 1–6 = powerplay, 7–15 = middle, 16–20 = death
+- phase column is pre-computed: values are 'powerplay', 'middle', 'death' — prefer this over filtering over_number
+- is_wicket is a BOOLEAN (true/false), not a string
+- wicket_player_out is the dismissed player (not player_out)
+- runs_batter = runs scored by batter; runs_total = total off the ball (batter + extras)
+- season is a VARCHAR like '2024' or '2020/21' (for UAE bubble season)
+- legal_balls_bowled and balls_remaining are pre-computed per delivery
+- matches.outcome_winner is the winning team (NULL for no-result/tie)
+
+Cricket formulas:
+- Strike Rate: (SUM(runs_batter) * 100.0) / NULLIF(COUNT(*) FILTER (WHERE extras_wides = 0 AND extras_noballs = 0), 0)
+- Economy Rate: (SUM(runs_total) * 6.0) / NULLIF(COUNT(*) FILTER (WHERE extras_wides = 0 AND extras_noballs = 0), 0)
+- Use FILTER (WHERE ...) syntax for conditional aggregates — this is PostgreSQL, not SQLite.
 
 Rules:
-1) Return ONLY valid SQLite SQL. No markdown, no code fences, no explanation.
-2) Use only the columns listed above. Never invent column names.
+1) Return ONLY valid PostgreSQL SQL. No markdown, no code fences, no explanation.
+2) Use only columns that exist in the schema. Never invent column names.
 3) Generate a single SELECT query (CTEs allowed via WITH).
-4) Prefer defensive SQL with NULLIF for division where appropriate.
-5) If the question asks for strike rate, use:
-   (SUM(runs_batter) * 100.0) / NULLIF(COUNT(*), 0)
-6) If the question asks for economy rate, use:
-   (SUM(runs_total) * 1.0) / NULLIF(COUNT(*) / 6.0, 0)
-7) For over-phase logic:
-   - Powerplay: over 1-6
-   - Middle overs: over 7-15
-   - Death overs: over 16-20
-8) Include sensible ORDER BY and LIMIT when user asks for top/best/worst rankings.
-9) If the question is ambiguous, produce the most reasonable cricket-analytics interpretation.
-10) When filtering player names, use short canonical values exactly as stored in dataset
-    (for example: V Kohli, RG Sharma). Do not expand to full names unless full name exists.
+4) Use NULLIF for all division to avoid divide-by-zero.
+5) Join deliveries → matches for season, venue, or team-level questions.
+6) Include sensible ORDER BY and LIMIT when user asks for top/best/worst rankings.
+7) When filtering player names, use Cricsheet short names (e.g. V Kohli, RG Sharma) — they are stored in deliveries.batter and deliveries.bowler.
+8) If the question is ambiguous, produce the most reasonable cricket-analytics interpretation.
+9) Do NOT use SQLite-specific syntax (no PRAGMA, no strftime — use PostgreSQL equivalents like EXTRACT or TO_CHAR).
+10) Do NOT include is_super_over = false filter unless asked — most questions refer to regulation play only; add this filter when appropriate.
 
 User question:
 {user_question}
@@ -56,18 +71,18 @@ User question:
 
 def generate_sql(
     user_question: str,
-    columns: Sequence[str],
+    schema: dict[str, list[str]],
     api_key: str,
     model_name: str = "gemini-2.5-flash",
 ) -> str:
     if not api_key:
         raise ValueError("Gemini API key is missing.")
-    if not columns:
-        raise ValueError("No schema columns available for SQL generation.")
+    if not schema:
+        raise ValueError("No schema available for SQL generation.")
 
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name=model_name)
-    prompt = build_prompt(user_question=user_question, columns=columns)
+    prompt = build_prompt(user_question=user_question, schema=schema)
     response = model.generate_content(prompt)
     sql = _clean_sql(response.text or "")
 

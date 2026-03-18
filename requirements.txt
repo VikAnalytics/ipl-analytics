@@ -1,4 +1,4 @@
 streamlit
 google-generativeai
 pandas
-# sqlite3 is part of Python's standard library.
+psycopg2-binary

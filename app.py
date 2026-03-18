@@ -2,100 +2,228 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path
+import time
 
 import pandas as pd
 import streamlit as st
 
 from ai_engine import generate_sql
 from database import (
-    DEFAULT_CSV_PATH,
-    DEFAULT_DB_PATH,
     execute_query,
+    get_dataset_stats,
     get_player_alias_map,
+    get_schema_for_prompt,
     get_table_columns,
-    init_db,
-    refresh_player_aliases,
 )
 
-st.set_page_config(page_title="IPL Analytics", layout="wide")
+st.set_page_config(
+    page_title="IPL Analytics",
+    page_icon="🏏",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ── CSS ────────────────────────────────────────────────────────────────────────
+GLASS_CSS = """
+<style>
+.stApp {
+    background: radial-gradient(ellipse at top left, #0d1b4b 0%, #080f2e 55%, #04071e 100%);
+    color: #e8edf8;
+}
+
+/* KPI cards */
+.kpi-card {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 16px;
+    padding: 18px 22px;
+    margin-bottom: 10px;
+    transition: transform 0.22s cubic-bezier(.34,1.56,.64,1),
+                box-shadow 0.22s ease,
+                border-color 0.22s ease;
+    cursor: default;
+}
+.kpi-card:hover {
+    transform: translateY(-7px);
+    box-shadow: 0 22px 48px rgba(0,0,0,0.45), 0 0 28px rgba(90,140,255,0.18);
+    border-color: rgba(90,140,255,0.35);
+}
+.kpi-title {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8aa0d4 !important;
+    margin-bottom: 6px;
+}
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #f4c95d !important;
+    line-height: 1.1;
+}
+
+/* Chat — Claude-style */
+[data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stChatMessage"]) {
+    max-width: 820px;
+    margin: 0 auto;
+}
+.stChatMessage {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    padding: 1rem 0.25rem !important;
+    border-bottom: 1px solid rgba(255,255,255,0.045) !important;
+}
+.stChatMessage:last-child { border-bottom: none !important; }
+.stChatMessage:has([data-testid="stChatMessageAvatarUser"]) {
+    background: rgba(244,201,93,0.05) !important;
+    border: 1px solid rgba(244,201,93,0.1) !important;
+    border-radius: 12px !important;
+    padding: 0.85rem 1.1rem !important;
+}
+[data-testid="stChatMessageAvatarUser"],
+[data-testid="stChatMessageAvatarAssistant"] {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    border-radius: 6px !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}
+[data-testid="stChatMessageContent"] {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #dde4f5 !important;
+}
+
+/* Chat input */
+[data-testid="stChatInputContainer"] {
+    background: rgba(4,8,28,0.95) !important;
+    border-top: 1px solid rgba(255,255,255,0.07) !important;
+    backdrop-filter: blur(20px);
+    padding: 0.6rem 1rem !important;
+}
+[data-testid="stChatInputContainer"] textarea {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 10px !important;
+    color: #e8edf8 !important;
+    font-size: 0.95rem !important;
+}
+[data-testid="stChatInputContainer"] textarea:focus {
+    border-color: rgba(90,140,255,0.45) !important;
+    box-shadow: 0 0 0 2px rgba(90,140,255,0.12) !important;
+}
+
+/* Tabs */
+[data-testid="stTabs"] button {
+    color: #8aa0d4 !important;
+    font-size: 0.88rem;
+    font-weight: 500;
+    border-radius: 10px 10px 0 0;
+    transition: color 0.15s, background 0.15s;
+}
+[data-testid="stTabs"] button[aria-selected="true"] {
+    color: #f4c95d !important;
+    border-bottom: 2px solid #f4c95d !important;
+    background: rgba(244,201,93,0.07) !important;
+}
+[data-testid="stTabsContent"] > div {
+    animation: tabFadeIn 0.28s ease-out;
+}
+@keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Thinking animation */
+.thinking-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(90,140,255,0.2);
+    border-radius: 14px;
+    margin: 8px 0;
+}
+.thinking-label { font-size: 0.9rem; color: #8aa0d4; letter-spacing: 0.04em; }
+.thinking-dots { display: flex; gap: 6px; }
+.thinking-dots span {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5a8cff, #a78bfa);
+    animation: dotBounce 1.3s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.18s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.55); opacity: 0.4; }
+    40%           { transform: scale(1.1);  opacity: 1;   }
+}
+
+/* Prompt chips */
+.prompt-chip button {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(90,140,255,0.28) !important;
+    border-radius: 999px !important;
+    color: #b0c4f0 !important;
+    font-size: 0.85rem !important;
+    padding: 0.38rem 1.1rem !important;
+    transition: background 0.16s, border-color 0.16s, transform 0.16s;
+}
+.prompt-chip button:hover {
+    background: rgba(90,140,255,0.12) !important;
+    border-color: rgba(90,140,255,0.6) !important;
+    color: #f4c95d !important;
+    transform: translateY(-2px);
+}
+
+/* Welcome hero */
+.welcome-hero {
+    text-align: center;
+    padding: 2.8rem 1rem 1.8rem;
+}
+.welcome-hero .hero-emoji { font-size: 3.2rem; line-height: 1; }
+.welcome-hero .hero-title {
+    font-size: 1.6rem; font-weight: 700;
+    color: #f8f9fc !important; margin-top: 0.7rem;
+}
+.welcome-hero .hero-sub {
+    font-size: 0.95rem; color: #8aa0d4 !important; margin-top: 0.5rem;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: rgba(6,12,36,0.88) !important;
+    border-right: 1px solid rgba(255,255,255,0.07) !important;
+    backdrop-filter: blur(14px);
+}
+
+/* Metric strip */
+[data-testid="stMetric"] {
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    padding: 8px 12px !important;
+}
+
+/* Code blocks */
+code, .stCode {
+    background: rgba(4,8,28,0.92) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+    color: #c9d8f8 !important;
+}
+
+h1, h2, h3, h4, h5, h6, p, label { color: #e8edf8 !important; }
+</style>
+"""
 
 
-def apply_theme() -> None:
-    st.markdown(
-        """
-        <style>
-          .stApp {
-            background: radial-gradient(circle at top right, #1b2f78 0%, #10204f 42%, #0a1637 100%);
-            color: #f8f9fc;
-          }
-          h1, h2, h3, h4, h5, h6, p, div, span, label { color: #f8f9fc !important; }
-          .stChatMessage {
-            background: rgba(7, 18, 52, 0.72);
-            border: 1px solid rgba(218, 169, 74, 0.22);
-            border-radius: 14px;
-            backdrop-filter: blur(4px);
-          }
-          [data-testid="stChatInputContainer"] {
-            border-top: 1px solid rgba(218, 169, 74, 0.35);
-            background: rgba(6, 16, 44, 0.96);
-          }
-          .kpi-card {
-            border: 1px solid rgba(218, 169, 74, 0.35);
-            border-radius: 12px;
-            padding: 14px;
-            background: rgba(9, 24, 63, 0.72);
-            margin-bottom: 8px;
-          }
-          .kpi-title {
-            font-size: 0.85rem;
-            color: #d7dff7 !important;
-            margin-bottom: 2px;
-          }
-          .kpi-value {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: #f4c95d !important;
-          }
-          code {
-            background-color: rgba(8, 20, 56, 0.96) !important;
-            color: #e8ecfa !important;
-          }
-          /* Example prompt chip buttons */
-          .prompt-chip button {
-            background: rgba(255,255,255,0.05) !important;
-            border: 1px solid rgba(218, 169, 74, 0.30) !important;
-            border-radius: 999px !important;
-            color: #d7dff7 !important;
-            font-size: 0.85rem !important;
-            padding: 0.35rem 1rem !important;
-            transition: background 0.15s, border-color 0.15s;
-          }
-          .prompt-chip button:hover {
-            background: rgba(218,169,74,0.12) !important;
-            border-color: rgba(218,169,74,0.65) !important;
-            color: #f4c95d !important;
-          }
-          /* Welcome screen */
-          .welcome-hero {
-            text-align: center;
-            padding: 2.5rem 1rem 1.5rem;
-          }
-          .welcome-hero .title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #f8f9fc !important;
-          }
-          .welcome-hero .subtitle {
-            font-size: 0.95rem;
-            color: #9aafd4 !important;
-            margin-top: 0.4rem;
-          }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
 def get_api_key() -> str:
     try:
@@ -104,168 +232,115 @@ def get_api_key() -> str:
         return os.getenv("GEMINI_API_KEY", "")
 
 
-def ensure_database(csv_path: str, db_path: str) -> None:
-    if not Path(db_path).exists():
-        with st.spinner("Initializing SQLite database from CSV..."):
-            init_db(csv_path=csv_path, db_path=db_path)
-
-
-def get_runtime_paths() -> tuple[str, str]:
-    csv_path = os.getenv("CSV_PATH", DEFAULT_CSV_PATH)
-    db_path = os.getenv("DB_PATH", DEFAULT_DB_PATH)
-    return csv_path, db_path
-
-
-@st.cache_resource(show_spinner=False)
-def prepare_database(csv_path: str, db_path: str, csv_mtime: float) -> bool:
-    # csv_mtime is included in cache key to refresh DB when CSV changes.
-    _ = csv_mtime
-    ensure_database(csv_path=csv_path, db_path=db_path)
-    refresh_player_aliases(db_path=db_path)
-    return True
+def get_database_url() -> str:
+    try:
+        return st.secrets.get("SUPABASE_DATABASE_URL", os.getenv("SUPABASE_DATABASE_URL", ""))
+    except Exception:
+        return os.getenv("SUPABASE_DATABASE_URL", "")
 
 
 def _normalize_free_text(text: str) -> str:
-    text = re.sub(r"[^a-z0-9 ]+", " ", text.lower())
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", text.lower())).strip()
 
 
-def resolve_player_aliases(question: str, db_path: str) -> tuple[str, list[str]]:
-    alias_map = get_player_alias_map(db_path=db_path)
-    if not alias_map:
-        try:
-            refresh_player_aliases(db_path=db_path)
-            alias_map = get_player_alias_map(db_path=db_path)
-        except Exception:
-            return question, []
+def resolve_player_aliases(question: str, database_url: str) -> tuple[str, list[str]]:
+    alias_map = get_player_alias_map(database_url=database_url)
     if not alias_map:
         return question, []
 
-    rewritten_question = question
-    normalized_question = _normalize_free_text(rewritten_question)
-    replacement_notes: list[str] = []
-    alias_candidates = sorted(alias_map.keys(), key=len, reverse=True)
-    for alias in alias_candidates:
-        canonical_name = alias_map[alias]
-        if not canonical_name:
+    rewritten = question
+    normalized = _normalize_free_text(rewritten)
+    notes: list[str] = []
+
+    for alias in sorted(alias_map.keys(), key=len, reverse=True):
+        canonical = alias_map[alias]
+        if not canonical or not re.search(r"\b" + re.escape(alias) + r"\b", normalized):
             continue
-        normalized_pattern = r"\b" + re.escape(alias) + r"\b"
-        if not re.search(normalized_pattern, normalized_question):
-            continue
+        pattern = r"\b" + r"\s+".join(re.escape(t) for t in alias.split() if t) + r"\b"
+        updated = re.sub(pattern, canonical, rewritten, flags=re.IGNORECASE)
+        if updated != rewritten:
+            rewritten = updated
+            normalized = _normalize_free_text(rewritten)
+            notes.append(f"{alias} → {canonical}")
 
-        tokens = [t for t in alias.split(" ") if t]
-        original_pattern = r"\b" + r"\s+".join(re.escape(t) for t in tokens) + r"\b"
-        updated_question = re.sub(
-            original_pattern,
-            canonical_name,
-            rewritten_question,
-            flags=re.IGNORECASE,
-        )
-        if updated_question != rewritten_question:
-            rewritten_question = updated_question
-            normalized_question = _normalize_free_text(rewritten_question)
-            replacement_notes.append(f"{alias} -> {canonical_name}")
-
-    return rewritten_question, replacement_notes
+    return rewritten, notes
 
 
-def get_dataset_stats(db_path: str) -> dict[str, str]:
-    stats = {"deliveries": "-", "matches": "-", "seasons": "-"}
-    try:
-        deliveries = execute_query("SELECT COUNT(*) AS c FROM deliveries", db_path=db_path)
-        matches = execute_query("SELECT COUNT(DISTINCT match_id) AS c FROM deliveries", db_path=db_path)
-        seasons = execute_query("SELECT COUNT(DISTINCT season) AS c FROM deliveries", db_path=db_path)
-        stats["deliveries"] = f"{int(deliveries.iloc[0]['c']):,}"
-        stats["matches"] = f"{int(matches.iloc[0]['c']):,}"
-        stats["seasons"] = f"{int(seasons.iloc[0]['c']):,}"
-    except Exception:
-        pass
-    return stats
+def _safe_col(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_]", "_", name).strip("_") or "col"
 
+
+def typewriter_sql(sql: str, container) -> None:
+    placeholder = container.empty()
+    step = max(4, len(sql) // 55)
+    for i in range(step, len(sql), step):
+        placeholder.code(sql[:i], language="sql")
+        time.sleep(0.018)
+    placeholder.code(sql, language="sql")
+
+
+def show_thinking(placeholder) -> None:
+    placeholder.markdown(
+        """
+        <div class="thinking-wrap">
+            <span class="thinking-label">AI is thinking</span>
+            <div class="thinking-dots"><span></span><span></span><span></span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ── UI components ──────────────────────────────────────────────────────────────
 
 def render_kpis(stats: dict[str, str]) -> None:
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(
-            f"<div class='kpi-card'><div class='kpi-title'>Total Deliveries</div><div class='kpi-value'>{stats['deliveries']}</div></div>",
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown(
-            f"<div class='kpi-card'><div class='kpi-title'>Unique Matches</div><div class='kpi-value'>{stats['matches']}</div></div>",
-            unsafe_allow_html=True,
-        )
-    with c3:
-        st.markdown(
-            f"<div class='kpi-card'><div class='kpi-title'>Seasons Covered</div><div class='kpi-value'>{stats['seasons']}</div></div>",
-            unsafe_allow_html=True,
-        )
-
-
-def _safe_col_name(name: str) -> str:
-    """Strip characters that Altair misreads as aggregation shorthand."""
-    return re.sub(r"[^a-zA-Z0-9_]", "_", name).strip("_") or "col"
+    for col, title, value in zip(
+        st.columns(3),
+        ["Total Deliveries", "Unique Matches", "Seasons Covered"],
+        [stats["deliveries"], stats["matches"], stats["seasons"]],
+    ):
+        with col:
+            st.markdown(
+                f'<div class="kpi-card"><div class="kpi-title">{title}</div>'
+                f'<div class="kpi-value">{value}</div></div>',
+                unsafe_allow_html=True,
+            )
 
 
 def render_chart(df: pd.DataFrame, chart_key: str) -> None:
     if df.empty:
-        st.info("No rows returned, so no chart is shown.")
+        st.info("No rows to chart.")
         return
-
     numeric_cols = list(df.select_dtypes(include="number").columns)
     if not numeric_cols:
         st.info("No numeric columns available for charting.")
         return
 
-    st.markdown("**Interactive Chart Builder**")
     all_cols = list(df.columns)
-    x_default = next((col for col in all_cols if col not in numeric_cols), all_cols[0])
-    y_default = numeric_cols[0]
+    x_default = next((c for c in all_cols if c not in numeric_cols), all_cols[0])
 
-    control_col_1, control_col_2, control_col_3 = st.columns(3)
-    x_col = control_col_1.selectbox(
-        "X-axis",
-        options=all_cols,
-        index=all_cols.index(x_default),
-        key=f"{chart_key}_x_col",
-    )
-    y_col = control_col_2.selectbox(
-        "Y-axis",
-        options=numeric_cols,
-        index=numeric_cols.index(y_default),
-        key=f"{chart_key}_y_col",
-    )
-    chart_type = control_col_3.selectbox(
-        "Chart Type",
-        options=["Bar", "Line", "Scatter"],
-        index=0,
-        key=f"{chart_key}_chart_type",
-    )
+    c1, c2, c3 = st.columns(3)
+    x_col = c1.selectbox("X-axis", all_cols, index=all_cols.index(x_default), key=f"{chart_key}_x")
+    y_col = c2.selectbox("Y-axis", numeric_cols, key=f"{chart_key}_y")
+    chart_type = c3.selectbox("Chart type", ["Bar", "Line", "Scatter"], key=f"{chart_key}_type")
 
     chart_df = df[[x_col, y_col]].dropna().head(200).copy()
     if chart_df.empty:
-        st.info("No chartable rows after filtering null values.")
+        st.info("No chartable rows after dropping nulls.")
         return
 
-    # Flatten x-axis to scalar strings so set_index never receives multi-dimensional data
-    # (can happen with YoY / grouped queries where SQLite returns object-typed columns).
     chart_df[x_col] = chart_df[x_col].astype(str)
-
-    # Altair interprets parens/slashes in column names as aggregation expressions and
-    # raises ValueError. Rename both columns to safe identifiers for the chart only.
-    safe_x = _safe_col_name(x_col)
-    safe_y = _safe_col_name(y_col)
-    if safe_x == safe_y:
-        safe_y = safe_y + "_value"
-    chart_df = chart_df.rename(columns={x_col: safe_x, y_col: safe_y})
+    sx, sy = _safe_col(x_col), _safe_col(y_col)
+    if sx == sy:
+        sy += "_value"
+    chart_df = chart_df.rename(columns={x_col: sx, y_col: sy})
 
     if chart_type == "Bar":
-        st.bar_chart(chart_df.set_index(safe_x), width="stretch")
+        st.bar_chart(chart_df.set_index(sx), width="stretch")
     elif chart_type == "Line":
-        st.line_chart(chart_df.set_index(safe_x), width="stretch")
+        st.line_chart(chart_df.set_index(sx), width="stretch")
     else:
-        st.scatter_chart(chart_df, x=safe_x, y=safe_y, width="stretch")
+        st.scatter_chart(chart_df, x=sx, y=sy, width="stretch")
 
 
 def render_response(payload: dict, response_key: str) -> None:
@@ -273,28 +348,50 @@ def render_response(payload: dict, response_key: str) -> None:
         st.markdown(payload["text"])
     if payload.get("error"):
         st.error(payload["error"])
-    if payload.get("sql"):
-        with st.expander("SQL", expanded=False):
-            st.code(payload["sql"], language="sql")
-    if payload.get("data") is not None:
-        df = payload["data"]
-        st.dataframe(df, width="stretch", height=420)
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Rows", f"{len(df):,}")
-        c2.metric("Columns", f"{len(df.columns):,}")
-        csv_bytes = df.to_csv(index=False).encode("utf-8")
-        c3.download_button(
-            "Download CSV",
-            data=csv_bytes,
-            file_name=f"{response_key}.csv",
-            mime="text/csv",
-            width="stretch",
-            key=f"{response_key}_download",
-        )
-        render_chart(df, chart_key=response_key)
+
+    df  = payload.get("data")
+    sql = payload.get("sql", "")
+    if df is None and not sql:
+        return
+
+    tab_data, tab_sql, tab_viz = st.tabs(["Data Preview", "SQL Logic", "Visual Analytics"])
+
+    with tab_data:
+        if df is not None and not df.empty:
+            st.dataframe(df, use_container_width=True, height=400)
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Rows", f"{len(df):,}")
+            m2.metric("Columns", f"{len(df.columns):,}")
+            m3.download_button(
+                "Download CSV",
+                data=df.to_csv(index=False).encode("utf-8"),
+                file_name=f"{response_key}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key=f"{response_key}_dl",
+            )
+        else:
+            st.info("No rows returned.")
+
+    with tab_sql:
+        if sql:
+            typed_set: set = st.session_state.setdefault("typed_messages", set())
+            if response_key not in typed_set:
+                typed_set.add(response_key)
+                typewriter_sql(sql, st.container())
+            else:
+                st.code(sql, language="sql")
+        else:
+            st.info("No SQL available.")
+
+    with tab_viz:
+        if df is not None:
+            render_chart(df, chart_key=response_key)
+        else:
+            st.info("Run a query to see charts.")
 
 
-_EXAMPLE_PROMPTS: list[tuple[str, str]] = [
+_EXAMPLE_PROMPTS = [
     ("🏆", "Top 10 run scorers of all time"),
     ("🎯", "Best death-over bowlers since 2018"),
     ("📈", "Virat Kohli's year-on-year run tally"),
@@ -304,185 +401,168 @@ _EXAMPLE_PROMPTS: list[tuple[str, str]] = [
 ]
 
 
-def render_welcome_prompts() -> None:
+def render_welcome() -> None:
     st.markdown(
         """
         <div class="welcome-hero">
-          <div style="font-size:2.8rem; line-height:1;">🏏</div>
-          <div class="title" style="margin-top:0.6rem;">IPL AI Analyst</div>
-          <div class="subtitle">Ask any cricket analytics question in plain English</div>
+            <div class="hero-emoji">🏏</div>
+            <div class="hero-title">IPL AI Analyst</div>
+            <div class="hero-sub">Ask any cricket analytics question in plain English</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown("")
     cols = st.columns(2)
     for i, (icon, text) in enumerate(_EXAMPLE_PROMPTS):
-        col = cols[i % 2]
-        with col:
+        with cols[i % 2]:
             st.markdown('<div class="prompt-chip">', unsafe_allow_html=True)
-            if st.button(f"{icon}  {text}", width="stretch", key=f"_eg_{i}"):
+            if st.button(f"{icon}  {text}", use_container_width=True, key=f"_eg_{i}"):
                 st.session_state["_prefill"] = text
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("")
 
 
-def initialize_state() -> None:
-    st.session_state.setdefault("messages", [])
-    st.session_state.setdefault("message_counter", 0)
-    st.session_state.setdefault("direct_sql", "SELECT * FROM deliveries LIMIT 50")
+# ── App ────────────────────────────────────────────────────────────────────────
 
+st.markdown(GLASS_CSS, unsafe_allow_html=True)
+st.session_state.setdefault("messages", [])
+st.session_state.setdefault("message_counter", 0)
+st.session_state.setdefault("direct_sql", "SELECT * FROM deliveries LIMIT 50")
+st.session_state.setdefault("typed_messages", set())
 
-apply_theme()
-initialize_state()
-api_key = get_api_key()
-csv_path, db_path = get_runtime_paths()
-
-st.title("IPL Analytics")
-st.caption("Production-ready dashboard for NL-to-SQL and direct SQL analytics (2008-2025).")
+api_key      = get_api_key()
+database_url = get_database_url()
 
 with st.sidebar:
-    st.header("How To Use")
+    st.markdown("## IPL Analytics")
+    st.caption("Powered by Gemini 2.5 Flash + Supabase")
+    st.divider()
     st.markdown(
         """
-1. Ask a question in **AI Analyst** to get SQL-powered answers.
-2. Use **SQL Studio** to run your own SQL (no Gemini calls).
-3. Use chart controls to choose X-axis, Y-axis, and chart type.
-4. Download any result as CSV from the result card.
+**How to use**
+1. Type a question in **AI Analyst** to get SQL-powered answers.
+2. Use **SQL Studio** for direct queries — no Gemini calls.
+3. Explore results across **Data Preview**, **SQL Logic**, and **Visual Analytics** tabs.
+4. Download any result as CSV.
         """
     )
     st.divider()
-    if st.button("🗑️  Clear chat history", width="stretch"):
+    if st.button("Clear chat history", use_container_width=True):
         st.session_state.messages = []
         st.session_state.message_counter = 0
+        st.session_state.typed_messages = set()
         st.rerun()
     st.divider()
-    st.caption("Data: IPL ball-by-ball (2008-2025).")
-    st.caption("For AI mode, `GEMINI_API_KEY` is configured by the app owner.")
+    st.caption("Dataset: IPL ball-by-ball 2008–2025 · Static")
 
-try:
-    if csv_path.startswith(("http://", "https://")):
-        csv_mtime = 0.0
-    else:
-        csv_file = Path(csv_path)
-        if not csv_file.exists():
-            raise FileNotFoundError(f"Dataset not found at `{csv_path}`.")
-        csv_mtime = csv_file.stat().st_mtime
-    prepare_database(csv_path=csv_path, db_path=db_path, csv_mtime=csv_mtime)
-except Exception as exc:
-    st.error(f"Database not ready: {exc}")
+if not database_url:
+    st.error("Supabase not configured. Set `SUPABASE_DATABASE_URL` in `.streamlit/secrets.toml`.")
+    st.stop()
 
-render_kpis(get_dataset_stats(db_path=db_path))
-tab_ai, tab_sql = st.tabs(["AI Analyst", "SQL Studio"])
+st.title("IPL Analytics")
+st.caption("Natural-language cricket analytics — 2008 to 2025.")
+render_kpis(get_dataset_stats(database_url=database_url))
+st.divider()
+
+tab_ai, tab_sql_studio = st.tabs(["AI Analyst", "SQL Studio"])
 
 with tab_ai:
     if not api_key:
-        st.warning("Gemini API key missing. Configure it to use AI Analyst.")
+        st.warning("Gemini API key not configured. Add `GEMINI_API_KEY` to secrets.")
 
-    # Render full chat history from session state
     for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
-            msg_key = msg.get("id", f"history_{idx}")
-            render_response(msg, response_key=msg_key)
+            render_response(msg, response_key=msg.get("id", f"history_{idx}"))
 
-    # Show welcome prompts only when there are no messages yet
     if not st.session_state.messages:
-        render_welcome_prompts()
+        render_welcome()
 
-    # Pick up a question from either the chat input or an example prompt button
     question = st.chat_input("Ask anything about IPL…")
     if not question:
         question = st.session_state.pop("_prefill", None)
 
     if question:
-        message_counter = st.session_state.message_counter
-        user_id = f"user_{message_counter}"
-        assistant_id = f"assistant_{message_counter}"
+        counter      = st.session_state.message_counter
+        assistant_id = f"assistant_{counter}"
 
-        user_payload = {"id": user_id, "role": "user", "text": question}
-        st.session_state.messages.append(user_payload)
-
-        # Show the user bubble immediately (no rerun needed)
+        st.session_state.messages.append({"id": f"user_{counter}", "role": "user", "text": question})
         with st.chat_message("user"):
             st.markdown(question)
 
         assistant_payload: dict = {"id": assistant_id, "role": "assistant"}
         with st.chat_message("assistant"):
+            thinking_ph = st.empty()
+            show_thinking(thinking_ph)
             try:
                 if not api_key:
-                    raise ValueError("Gemini API key missing. Configure secrets and retry.")
-
-                columns = get_table_columns(db_path=db_path)
-                if not columns:
-                    raise ValueError("No table schema found. Initialize the database first.")
-
-                rewritten_question, alias_notes = resolve_player_aliases(question, db_path=db_path)
-
-                with st.status("Thinking…", expanded=False) as status:
-                    st.write("Generating SQL query…")
-                    sql = generate_sql(user_question=rewritten_question, columns=columns, api_key=api_key)
-                    st.write("Running query against database…")
-                    result_df = execute_query(sql, db_path=db_path)
-                    status.update(label="Done", state="complete", expanded=False)
+                    raise ValueError("Gemini API key missing — configure secrets and retry.")
+                schema = get_schema_for_prompt(database_url=database_url)
+                if not schema:
+                    raise ValueError("No schema found. Check your Supabase connection.")
+                rewritten, alias_notes = resolve_player_aliases(question, database_url=database_url)
+                sql       = generate_sql(user_question=rewritten, schema=schema, api_key=api_key)
+                result_df = execute_query(sql, database_url=database_url)
+                thinking_ph.empty()
 
                 row_count = len(result_df)
-                summary = f"Here {'is' if row_count == 1 else 'are'} the results — **{row_count:,}** {'row' if row_count == 1 else 'rows'} returned."
+                summary = (
+                    f"Here {'is' if row_count == 1 else 'are'} the results — "
+                    f"**{row_count:,}** {'row' if row_count == 1 else 'rows'} returned."
+                )
                 if alias_notes:
-                    summary += f"\n\n*Name{'s' if len(alias_notes) > 1 else ''} normalized: {', '.join(alias_notes[:5])}*"
-
-                assistant_payload["text"] = summary
-                assistant_payload["sql"] = sql
-                assistant_payload["data"] = result_df
-
+                    summary += f"\n\n*Names normalized: {', '.join(alias_notes[:5])}*"
+                assistant_payload.update({"text": summary, "sql": sql, "data": result_df})
             except Exception as exc:
-                assistant_payload["text"] = "I couldn't complete that request."
-                assistant_payload["error"] = str(exc)
+                thinking_ph.empty()
+                assistant_payload.update({"text": "I couldn't complete that request.", "error": str(exc)})
 
             render_response(assistant_payload, response_key=assistant_id)
 
         st.session_state.messages.append(assistant_payload)
-        st.session_state.message_counter = message_counter + 1
+        st.session_state.message_counter = counter + 1
 
-with tab_sql:
+with tab_sql_studio:
     st.markdown("### SQL Studio")
-    st.caption("Run your own read-only SQL directly. This mode does not call Gemini.")
-    with st.expander("Dataset & Column Overview", expanded=False):
-        st.markdown("**Dataset:** `deliveries`")
-        try:
-            studio_columns = get_table_columns(db_path=db_path)
-            if studio_columns:
-                st.caption(f"{len(studio_columns)} columns available")
-                st.code(", ".join(studio_columns))
-            else:
-                st.info("No columns found. Database may still be initializing.")
-        except Exception as exc:
-            st.info(f"Could not load schema yet: {exc}")
+    st.caption("Run read-only PostgreSQL directly against Supabase. No Gemini calls.")
 
-    direct_sql = st.text_area("SQL Query", value=st.session_state.direct_sql, height=220)
+    with st.expander("Schema reference", expanded=False):
+        try:
+            cols = get_table_columns(database_url=database_url)
+            if cols:
+                st.markdown("**`deliveries`** table")
+                st.caption(f"{len(cols)} columns")
+                st.code(", ".join(cols))
+        except Exception as exc:
+            st.info(f"Could not load schema: {exc}")
+
+    direct_sql = st.text_area("SQL Query", value=st.session_state.direct_sql, height=200)
     st.session_state.direct_sql = direct_sql
-    run_col, sample_col = st.columns([1, 1])
-    run_clicked = run_col.button("Run SQL", type="primary", width="stretch")
-    sample_col.code("SELECT batter, SUM(runs_batter) AS runs FROM deliveries GROUP BY batter ORDER BY runs DESC LIMIT 20")
+
+    run_col, sample_col = st.columns([1, 2])
+    run_clicked = run_col.button("Run SQL", type="primary", use_container_width=True)
+    sample_col.code(
+        "SELECT batter, SUM(runs_batter) AS runs\nFROM deliveries\n"
+        "GROUP BY batter\nORDER BY runs DESC\nLIMIT 20",
+        language="sql",
+    )
+
     if run_clicked:
         try:
-            with st.spinner("Executing SQL..."):
-                result_df = execute_query(direct_sql, db_path=db_path)
+            with st.spinner("Executing…"):
+                result_df = execute_query(direct_sql, database_url=database_url)
             st.session_state.direct_sql_result = {
-                "id": "direct_sql_result",
-                "role": "assistant",
-                "text": f"SQL executed successfully. Returned **{len(result_df):,}** rows.",
+                "id": "studio_result",
+                "text": f"Returned **{len(result_df):,}** rows.",
                 "sql": direct_sql,
                 "data": result_df,
             }
         except Exception as exc:
             st.session_state.direct_sql_result = {
-                "id": "direct_sql_result",
-                "role": "assistant",
-                "text": "I could not execute that SQL.",
+                "id": "studio_result",
+                "text": "Query failed.",
                 "sql": direct_sql,
                 "error": str(exc),
             }
-    if st.session_state.get("direct_sql_result"):
-        render_response(st.session_state.direct_sql_result, response_key="direct_sql_result")
 
+    if st.session_state.get("direct_sql_result"):
+        render_response(st.session_state.direct_sql_result, response_key="studio_result")
