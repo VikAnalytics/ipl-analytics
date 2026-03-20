@@ -12,9 +12,6 @@ from config import PROMPT_TABLES
 logger = logging.getLogger(__name__)
 
 DELIVERIES_TABLE = "deliveries"
-MATCHES_TABLE    = "matches"
-INNINGS_TABLE    = "innings"
-PLAYERS_TABLE    = "players"
 
 MANUAL_PLAYER_ALIASES = {
     "virat kohli": "V Kohli",
