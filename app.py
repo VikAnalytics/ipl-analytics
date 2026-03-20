@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -436,9 +437,13 @@ def render_welcome() -> None:
 
 # ── App ────────────────────────────────────────────────────────────────────────
 
+QUERY_LIMIT = 20  # max Gemini calls per session
+
 st.markdown(GLASS_CSS, unsafe_allow_html=True)
 st.session_state.setdefault("messages", [])
 st.session_state.setdefault("message_counter", 0)
+st.session_state.setdefault("query_count", 0)
+st.session_state.setdefault("query_cache", {})
 st.session_state.setdefault("direct_sql", "SELECT * FROM deliveries LIMIT 50")
 st.session_state.setdefault("typed_messages", set())
 
@@ -462,8 +467,15 @@ with st.sidebar:
     if st.button("Clear chat history", use_container_width=True):
         st.session_state.messages = []
         st.session_state.message_counter = 0
+        st.session_state.query_count = 0
+        st.session_state.query_cache = {}
         st.session_state.typed_messages = set()
         st.rerun()
+    st.divider()
+    remaining = QUERY_LIMIT - st.session_state.query_count
+    st.caption(f"AI queries this session: {st.session_state.query_count} / {QUERY_LIMIT}")
+    if remaining <= 5:
+        st.warning(f"{remaining} AI queries remaining. Clear chat to reset.")
     st.divider()
     st.caption("Dataset: IPL ball-by-ball 2008–2025 · Static")
 
@@ -516,22 +528,42 @@ with tab_ai:
             try:
                 if not api_key:
                     raise ValueError("Gemini API key missing — configure secrets and retry.")
-                schema = get_schema_for_prompt(database_url=database_url)
-                if not schema:
-                    raise ValueError("No schema found. Check your Supabase connection.")
-                rewritten, alias_notes = resolve_player_aliases(question, database_url=database_url)
-                sql       = generate_sql(user_question=rewritten, schema=schema, api_key=api_key)
-                result_df = execute_query(sql, database_url=database_url)
-                thinking_ph.empty()
 
-                row_count = len(result_df)
-                summary = (
-                    f"Here {'is' if row_count == 1 else 'are'} the results — "
-                    f"**{row_count:,}** {'row' if row_count == 1 else 'rows'} returned."
-                )
-                if alias_notes:
-                    summary += f"\n\n*Names normalized: {', '.join(alias_notes[:5])}*"
-                assistant_payload.update({"text": summary, "sql": sql, "data": result_df})
+                # Rate limiting
+                if st.session_state.query_count >= QUERY_LIMIT:
+                    raise ValueError(
+                        f"Session query limit reached ({QUERY_LIMIT} AI queries). "
+                        "Clear chat history to reset."
+                    )
+
+                # Cache lookup — skip Gemini + DB if already answered this question
+                cache_key = hashlib.md5(question.strip().lower().encode()).hexdigest()
+                cached = st.session_state.query_cache.get(cache_key)
+                if cached:
+                    thinking_ph.empty()
+                    assistant_payload.update({**cached, "id": assistant_id, "role": "assistant"})
+                else:
+                    schema = get_schema_for_prompt(database_url=database_url)
+                    if not schema:
+                        raise ValueError("No schema found. Check your Supabase connection.")
+                    rewritten, alias_notes = resolve_player_aliases(question, database_url=database_url)
+                    sql       = generate_sql(user_question=rewritten, schema=schema, api_key=api_key)
+                    result_df = execute_query(sql, database_url=database_url)
+                    thinking_ph.empty()
+
+                    row_count = len(result_df)
+                    summary = (
+                        f"Here {'is' if row_count == 1 else 'are'} the results — "
+                        f"**{row_count:,}** {'row' if row_count == 1 else 'rows'} returned."
+                    )
+                    if alias_notes:
+                        summary += f"\n\n*Names normalized: {', '.join(alias_notes[:5])}*"
+
+                    payload_data = {"text": summary, "sql": sql, "data": result_df}
+                    st.session_state.query_cache[cache_key] = payload_data
+                    st.session_state.query_count += 1
+                    assistant_payload.update(payload_data)
+
             except Exception as exc:
                 thinking_ph.empty()
                 assistant_payload.update({"text": "I couldn't complete that request.", "error": str(exc)})

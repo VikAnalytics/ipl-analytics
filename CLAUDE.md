@@ -99,80 +99,37 @@ See the section below for prioritized upgrade paths.
 
 # Upgrade Recommendations
 
-## P0 — Critical for Reliability
+## Done
 
-### 1. Pin dependency versions in `requirements.txt`
-Current `requirements.txt` has no version pins. A Gemini API or Streamlit breaking change will silently break the app.
-```
-streamlit==1.43.0
-google-generativeai==0.8.3
-pandas==2.2.3
-```
-Run `pip freeze > requirements.txt` after verifying the app works.
+| # | Item |
+|---|------|
+| 1 | Pin dependency versions — all packages pinned in `requirements.txt` |
+| 2 | Query timeout — `connect_timeout=10` in `core/database.py:_connect()` |
+| 3 | Rate-limit Gemini calls — 20 queries/session, counter shown in sidebar (`app.py:QUERY_LIMIT`) |
+| 4 | Migrate to PostgreSQL — on Supabase/psycopg2, SQLite removed |
+| 5 | Remove flat files — data lives in Supabase, no CSV/DB artifacts |
+| 6 | Composite indexes — run in Supabase SQL editor (see below) |
+| 7 | Query result caching — MD5 hash cache in session state (`app.py:query_cache`) |
+| 8 | SQL validation — `sqlparse` pre-execution check in `core/database.py:_validate_sql()` |
+| 9 | Structured logging — `logging` module in all files, INFO level |
+| 10 | Test suite — 30 tests across `tests/` (database, ai_engine, aliases) |
+| 11 | Separate config — `config.py` holds model name and all prompt text |
+| 12 | PostgreSQL migration — done (see #4) |
+| 15 | Dataset scope in UI — sidebar caption + AI query counter |
 
-### 2. Add query timeout to SQLite execution
-Long-running LLM-generated queries (e.g., full table scans with subqueries) can hang the app. Add a timeout:
-```python
-conn.execute("PRAGMA busy_timeout = 5000")  # 5s
-```
-Or use `sqlite3.Connection` with a thread-based timeout wrapper.
+## Composite Index SQL (run once in Supabase SQL Editor)
 
-### 3. Rate-limit Gemini API calls per session
-No rate limiting exists. A user can spam queries and exhaust the API quota. Add a per-session query counter in `st.session_state`.
-
-## P1 — Scalability
-
-### 4. Replace SQLite with DuckDB
-DuckDB is a drop-in analytical database that outperforms SQLite 5–20x on aggregation queries over wide tables. It supports Parquet natively, reducing storage from ~121MB to ~30MB. Migration is minimal — `duckdb.connect()` instead of `sqlite3.connect()`, same SQL dialect.
-
-### 5. Store data as Parquet instead of CSV
-`data.csv` at 103MB loads slowly. Parquet with snappy compression reduces this to ~20–25MB and is 3–5x faster to load with Pandas. Use `df.to_parquet("data.parquet")` and update `_load_dataframe()`.
-
-### 6. Add composite indexes for common query patterns
-Current indexes are single-column. Common analytics queries filter on `(season, batter)`, `(batting_team, venue)`, etc. Add:
 ```sql
-CREATE INDEX idx_season_batter ON deliveries(season, batter);
-CREATE INDEX idx_team_venue ON deliveries(batting_team, venue);
-CREATE INDEX idx_over_wicket ON deliveries(over, wicket_kind);
+CREATE INDEX IF NOT EXISTS idx_deliveries_season_batter   ON deliveries(season, batter);
+CREATE INDEX IF NOT EXISTS idx_deliveries_batting_team_venue ON deliveries(batting_team, venue);
+CREATE INDEX IF NOT EXISTS idx_deliveries_phase_wicket    ON deliveries(phase, is_wicket);
+CREATE INDEX IF NOT EXISTS idx_deliveries_season_bowler   ON deliveries(season, bowler);
 ```
 
-### 7. Implement query result caching
-Identical NL questions re-call Gemini and re-run SQL. Cache `(question_hash → DataFrame)` in session state or an LRU cache. Saves API cost and latency for repeated queries.
-
-## P2 — Robustness
-
-### 8. Add SQL validation before execution
-Gemini occasionally returns syntactically invalid SQL. Parse the SQL with `sqlparse` before running it and surface a clean error message instead of a raw SQLite exception.
-
-### 9. Structured logging
-Currently errors are printed to console. Use Python `logging` with structured output (JSON) so Streamlit Cloud logs are queryable:
-```python
-import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-```
-
-### 10. Add a `conftest.py` test suite
-Zero automated tests exist. At minimum, test:
-- `execute_query()` blocks write keywords
-- `generate_sql()` returns a SELECT/WITH statement
-- `resolve_player_aliases()` maps known aliases correctly
-- Chart rendering doesn't crash on empty DataFrames
-
-Use `pytest` with a fixture that creates an in-memory SQLite DB from a 100-row sample.
-
-### 11. Separate config from code
-`ai_engine.py` hardcodes `gemini-2.5-flash` and prompt text inline. Move model name and prompt template to a config dict or `config.py` so swapping models or tuning prompts doesn't require editing logic code.
-
-## P3 — Long-term Scale
-
-### 12. Multi-user: move to PostgreSQL + connection pool
-SQLite is single-writer. For >5 concurrent users (e.g., shared team deployment), migrate to PostgreSQL with `psycopg2` + SQLAlchemy connection pooling. The flat table schema transfers directly.
+## Remaining (P3 — Long-term)
 
 ### 13. Async Gemini calls
 `generate_sql()` is synchronous and blocks the Streamlit event loop. Use `asyncio` + `google.generativeai.GenerativeModel.generate_content_async()` to keep the UI responsive during long model calls.
 
 ### 14. Upgrade Python to 3.12
 Python 3.9 EOL is October 2025. Streamlit Cloud already supports 3.12. Upgrading unlocks performance improvements and security patches with no breaking changes for this codebase.
-
-### 15. Surface dataset scope in the UI
-The dataset is static (IPL 2008–2025). Add a small info note in the UI sidebar so users know the data boundary upfront — prevents confusion when querying for seasons beyond 2025.
