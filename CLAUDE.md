@@ -50,7 +50,7 @@ Key tables:
 
 | Table | Rows | Key Columns |
 |-------|------|-------------|
-| `deliveries` | 278,205 | `match_id`, `innings_id`, `over_number` (0-idx), `batter`, `bowler`, `runs_batter`, `runs_total`, `is_wicket`, `wicket_kind`, `wicket_player_out`, `phase`, `extras_wides`, `extras_noballs` |
+| `deliveries` | 278,205 | `match_id`, `innings_id`, `over_number` (1-idx), `batter`, `bowler`, `runs_batter`, `runs_total`, `is_wicket`, `wicket_kind`, `wicket_player_out`, `phase`, `extras_wides`, `extras_noballs` |
 | `matches` | 1,169 | `match_id`, `season`, `venue`, `city`, `match_date`, `team1`, `team2`, `outcome_winner`, `outcome_by_runs`, `outcome_by_wickets` |
 | `players` | 925 | `player_key`, `player_name`, `full_name`, `nationality`, `batting_style`, `bowling_style`, `playing_role` |
 | `innings` | 2,365 | `innings_id`, `match_id`, `innings_number`, `team`, `target_runs`, `is_super_over` |

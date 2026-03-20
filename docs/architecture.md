@@ -1,58 +1,79 @@
-# Cricket Analytics AI - Architecture
+# IPL Analytics — Architecture
 
 ## Overview
 
-This system converts natural-language cricket questions into executable SQLite queries, runs them on a local indexed database, and visualizes results in Streamlit.
+Converts natural-language cricket questions into PostgreSQL queries, executes them against a normalised Supabase database (9 tables, ~278k deliveries), and renders results in Streamlit.
 
 ## End-to-End Flow
 
-1. **User Query (Streamlit UI)**
-   - User asks a question in chat format (for example, "Top 5 bowlers by death-over wickets").
+```
+User Question (Streamlit chat)
+        │
+        ▼
+Player Alias Normalisation (app.py)
+  "Virat Kohli" → "V Kohli"  via players table + manual overrides
+        │
+        ▼
+Gemini 2.5 Flash (core/ai_engine.py)
+  build_prompt() injects schema, join guide, cricket formulas, query rules
+  generate_sql() calls Gemini API → raw text → _clean_sql() strips fences
+        │
+        ▼
+SQL Validation (core/database.py)
+  _validate_sql() — sqlparse check: single statement, SELECT/WITH only
+  execute_query() — keyword block: INSERT/UPDATE/DELETE/DROP/ALTER/CREATE
+        │
+        ▼
+Supabase / PostgreSQL (psycopg2)
+  pd.read_sql_query() → Pandas DataFrame
+        │
+        ▼
+Streamlit UI (app.py)
+  Data Preview | SQL Logic (typewriter) | Visual Analytics tabs
+```
 
-2. **Gemini SQL Generation (`ai_engine.py`)**
-   - The app sends the user question plus the exact `deliveries` table schema to Gemini.
-   - Prompt constraints force output to be a single valid SQLite `SELECT`/`WITH` query.
-   - Domain rules include cricket formulas like strike rate and economy rate.
+## Data Layer
 
-3. **SQLite Execution (`database.py`)**
-   - SQL is validated as read-only and executed against local SQLite DB.
-   - Results are returned as a Pandas DataFrame.
+**Database:** Supabase (PostgreSQL), connected via connection pooler (IPv4, port 5432).
 
-4. **Result Display (`app.py`)**
-   - Shows generated SQL in an expander.
-   - Renders raw result table.
-   - Auto-generates a quick summary chart when numeric output is present.
+**Key tables:**
 
-## Data Layer Design
+| Table | Rows | Purpose |
+|-------|------|---------|
+| `deliveries` | ~278k | Ball-by-ball events — batter, bowler, runs, wicket, phase |
+| `matches` | 1,169 | Match metadata — season, venue, teams, outcome |
+| `innings` | 2,365 | Innings context — batting team, target |
+| `players` | 925 | Player profiles — full name, style, nationality |
 
-- CSV source: `data.csv` (ball-by-ball IPL data for 2008-2025).
-- DB file: `cricket.db`.
-- Table: `deliveries` (flat "fat table" for LLM-friendly querying).
-- Indexes:
-  - `bowler`
-  - `batter`
-  - `match_id`
-  - `venue`
+**Primary join:** `deliveries.match_id → matches.match_id` (required for any season or venue filter)
 
-This indexing strategy significantly improves query speed for common player, match, and venue filters.
+**Pre-computed columns:**
+- `phase` — `'powerplay'` / `'middle'` / `'death'` (prefer over filtering `over_number`)
+- `over_number` — 1-indexed (1–20)
+- `legal_balls_bowled`, `balls_remaining` — pre-computed per delivery
 
-## Safety and Reliability
+## Configuration (`config.py`)
 
-- Only read-only SQL is executed (`SELECT` / `WITH`).
-- Write and schema-changing SQL keywords are blocked.
-- Errors (invalid SQL, missing schema, missing API key, DB init failures) are surfaced cleanly in UI.
-- Gemini API key is loaded from Streamlit secrets or environment variables.
+All prompt strings, the Gemini model name, and the list of tables exposed to the AI live in `config.py`. Changes here directly affect query quality — no other file needs touching.
 
-## Configuration
+**Cricket formulas injected into every prompt:**
+- Strike Rate: `(SUM(runs_batter) * 100.0) / NULLIF(legal balls, 0)`
+- Economy Rate: `(SUM(runs_total) * 6.0) / NULLIF(legal balls, 0)`
 
-- API key in `.streamlit/secrets.toml`:
+## Safety
+
+- `_validate_sql()` uses `sqlparse` — rejects non-SELECT, empty, or multi-statement SQL before any DB call
+- `execute_query()` does a second keyword scan for write operations
+- 20 AI query limit per session (rate limiting in `app.py`)
+- Identical questions are served from an MD5 hash cache (session state), skipping Gemini and the DB entirely
+- All DB connections use `connect_timeout=10s`
+
+## Secrets
 
 ```toml
-GEMINI_API_KEY="your_key_here"
+# .streamlit/secrets.toml
+GEMINI_API_KEY = "..."
+SUPABASE_DATABASE_URL = "postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
 ```
 
-- Run app:
-
-```bash
-streamlit run app.py
-```
+Use the Supabase **connection pooler** URL (not the direct DB URL) to avoid IPv6 routing issues on Streamlit Cloud.

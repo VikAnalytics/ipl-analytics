@@ -1,88 +1,81 @@
 # IPL Analytics
 
-An AI-powered cricket intelligence workspace for fans, analysts, and strategy leaders.
-
-`IPL Analytics` turns natural-language questions into SQL, runs them on ball-by-ball IPL data (2008-2025), and returns executive-ready insights with interactive visualizations.
-
-## Why This Is Different
-
-- **For cricket lovers:** ask real match questions in plain English and explore player, phase, venue, and season trends instantly.
-- **For stats-first users:** inspect generated SQL, run direct SQL, and validate every number from source data.
-- **For business decision-makers:** convert large, noisy match data into concise, explainable insights fast enough for weekly reviews and sponsor narratives.
-
-## Executive Narrative
-
-- **Data to decision in minutes:** from raw ball-by-ball events to boardroom-ready trend cuts.
-- **Transparent AI:** every natural-language output is backed by inspectable SQL.
-- **Scalable foundation:** lightweight stack (Streamlit + SQLite + Gemini) with clear migration path to managed data warehouses.
-
-In short, this is not just a dashboard. It is a decision-support system where cricket intuition and statistical rigor meet.
-
+An AI-powered cricket analytics platform that converts natural-language questions into SQL, executes them against ball-by-ball IPL data (2008–2025), and visualises results in an interactive Streamlit dashboard.
 
 ## What You Can Ask
 
 - Who are the top death-over wicket takers since 2018?
-- How does powerplay strike rate differ by venue?
-- Which bowlers maintain the best economy against specific batting units?
-- How have batting acceleration patterns changed by season?
+- How does Virat Kohli's strike rate compare in powerplay vs death overs?
+- Which venues favour bowlers the most?
+- Head-to-head: CSK vs MI win percentage by season
 
-## Product Highlights
+## Features
 
-- **Natural Language -> SQL** with Gemini
-- **Direct SQL Studio** (no AI call required)
-- **Schema-aware SQL generation** grounded on real columns
-- **Interactive chart builder** with dynamic X/Y selection
-- **Name normalization** for player aliases (for example, `Virat Kohli` -> `V Kohli`)
-- **Downloadable result datasets** as CSV
+- **Natural language → SQL** via Google Gemini 2.5 Flash
+- **SQL Studio** — run direct read-only PostgreSQL, no AI call needed
+- **Schema-aware generation** grounded on real Supabase column names
+- **Player alias normalisation** (`Virat Kohli` → `V Kohli`)
+- **Interactive chart builder** with dynamic axis selection
+- **Query result cache** — identical questions skip Gemini and the DB
+- **Downloadable results** as CSV
 
-## Architecture
+## Stack
 
-Flow:
-`User Query -> Gemini SQL Generation -> SQLite Execution -> Streamlit Visualization`
+| Layer | Technology |
+|-------|-----------|
+| UI | Streamlit |
+| AI Engine | Google Gemini 2.5 Flash |
+| Database | Supabase (PostgreSQL, `psycopg2-binary`) |
+| Data processing | Pandas |
 
-Code layout:
+## Project Structure
 
-- `app.py` - Streamlit application, chat/SQL studio, visualization
-- `database.py` - CSV -> SQLite, indexing, alias mapping, query execution
-- `ai_engine.py` - Gemini prompt and SQL generation rules
-- `architecture.md` - system-level architecture notes
-- `SKILL.md` - cricket analytics capabilities supported by the assistant
-
-## Data Model
-
-- Single flat table: `deliveries`
-- Indexed dimensions: `bowler`, `batter`, `match_id`, `venue`
-- Designed for low-friction analytics and LLM reliability (no join guessing)
+```
+app.py              Streamlit entry point — UI, chat, session state
+config.py           Gemini model name, prompt tables, prompt template strings
+core/
+  database.py       Supabase connection, query execution, schema helpers, alias map
+  ai_engine.py      Gemini prompt construction and SQL generation
+tests/
+  conftest.py       Shared fixtures
+  test_database.py  SQL validation and execute_query tests
+  test_ai_engine.py Prompt building and SQL generation tests
+  test_aliases.py   Player alias resolution tests
+docs/
+  architecture.md   System flow and data layer design
+  SKILL.md          Analytics capabilities reference
+```
 
 ## Run Locally
 
-1. Install dependencies:
-   - `pip install -r requirements.txt`
-2. Add your API key in `.streamlit/secrets.toml`:
-   - `GEMINI_API_KEY="your_key_here"`
-3. Place dataset as `data.csv` in project root.
-4. Start app:
-   - `streamlit run app.py`
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-## Deployment Notes (Streamlit Community Cloud)
+Create `.streamlit/secrets.toml`:
 
-- Add `GEMINI_API_KEY` in Streamlit app Secrets (never commit it).
-- Dataset and DB are intentionally excluded from Git in this repo template.
-- Configure runtime paths using environment variables if needed:
-- `CSV_PATH` (default: `data.csv`, can also be an `https://` CSV URL)
-  - `DB_PATH` (default: `cricket.db`)
+```toml
+GEMINI_API_KEY = "your_gemini_key"
+SUPABASE_DATABASE_URL = "postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
+```
 
-### One-Click Streamlit Cloud Setup
+```bash
+streamlit run app.py
+```
 
-1. Go to [Streamlit Community Cloud](https://share.streamlit.io/).
-2. Select repo: `VikAnalytics/ipl-analytics`
-3. Main file: `app.py`
-4. In app settings, set:
-   - **Secrets**:
-     - `GEMINI_API_KEY = "your_key"`
-   - **Environment variables**:
-     - `CSV_PATH = "https://<your-public-host>/data.csv"` (recommended for cloud)
-     - optional `DB_PATH = "cricket.db"`
-5. Deploy.
+## Deploy to Streamlit Cloud
 
-If `CSV_PATH` is a URL, the app loads data directly from that source and builds SQLite on startup.
+1. Push repo to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io), connect the repo, set main file to `app.py`
+3. In **Secrets**, add:
+   ```
+   GEMINI_API_KEY = "..."
+   SUPABASE_DATABASE_URL = "..."
+   ```
+4. Use the Supabase **connection pooler** URL (IPv4, port 5432) — not the direct DB URL
+
+## Dataset
+
+Static IPL ball-by-ball data, 2008–2025 (~278k deliveries across 1,169 matches). Hosted in Supabase — no CSV or local DB file required.
