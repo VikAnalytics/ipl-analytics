@@ -119,11 +119,19 @@ See the section below for prioritized upgrade paths.
 
 ## Composite Index SQL (run once in Supabase SQL Editor)
 
+`season` and `venue` live in `matches`, not `deliveries`. Indexes must target the correct tables:
+
 ```sql
-CREATE INDEX IF NOT EXISTS idx_deliveries_season_batter   ON deliveries(season, batter);
-CREATE INDEX IF NOT EXISTS idx_deliveries_batting_team_venue ON deliveries(batting_team, venue);
-CREATE INDEX IF NOT EXISTS idx_deliveries_phase_wicket    ON deliveries(phase, is_wicket);
-CREATE INDEX IF NOT EXISTS idx_deliveries_season_bowler   ON deliveries(season, bowler);
+-- deliveries: filter by batter, bowler, phase, wicket; join via match_id / innings_id
+CREATE INDEX IF NOT EXISTS idx_deliveries_batter        ON deliveries(batter);
+CREATE INDEX IF NOT EXISTS idx_deliveries_bowler        ON deliveries(bowler);
+CREATE INDEX IF NOT EXISTS idx_deliveries_phase_wicket  ON deliveries(phase, is_wicket);
+CREATE INDEX IF NOT EXISTS idx_deliveries_match_id      ON deliveries(match_id);
+CREATE INDEX IF NOT EXISTS idx_deliveries_innings_id    ON deliveries(innings_id);
+
+-- matches: filter by season, venue
+CREATE INDEX IF NOT EXISTS idx_matches_season           ON matches(season);
+CREATE INDEX IF NOT EXISTS idx_matches_venue            ON matches(venue);
 ```
 
 ## Remaining (P3 — Long-term)
