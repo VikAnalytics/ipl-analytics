@@ -17,11 +17,19 @@ AI-powered cricket analytics platform. Converts natural-language questions to SQ
 ## File Map
 
 ```
-app.py          Main Streamlit app — UI, chat, chart rendering, session state
-database.py     Supabase connection, query execution, player alias normalization
-ai_engine.py    Gemini prompt construction and SQL generation
-SKILL.md        65+ documented analytics capabilities
-architecture.md System flow diagram and data layer design
+app.py                    Main Streamlit entry point — UI, chat, chart rendering, session state
+config.py                 All config — Gemini model, prompt tables, prompt template strings
+core/
+  database.py             Supabase connection, query execution, player alias normalization
+  ai_engine.py            Gemini prompt construction and SQL generation
+tests/
+  conftest.py             Shared fixtures
+  test_database.py        SQL validation and execute_query tests
+  test_ai_engine.py       Prompt building and SQL generation tests
+  test_aliases.py         Player alias resolution tests
+docs/
+  SKILL.md                65+ documented analytics capabilities
+  architecture.md         System flow diagram and data layer design
 ```
 
 ## Key Architecture Decisions
@@ -30,11 +38,11 @@ architecture.md System flow diagram and data layer design
 
 **Over numbering** — `over_number` in Supabase is **1-indexed** (1–20). The `phase` column is pre-computed (`'powerplay'`, `'middle'`, `'death'`). Always prefer `phase` over filtering `over_number`.
 
-**Player alias normalization** — `get_player_alias_map()` queries `players.full_name → players.player_name` in Supabase. Manual overrides (e.g., "Virat Kohli" → "V Kohli") are in `database.py:MANUAL_PLAYER_ALIASES`.
+**Player alias normalization** — `get_player_alias_map()` queries `players.full_name → players.player_name` in Supabase. Manual overrides (e.g., "Virat Kohli" → "V Kohli") are in `core/database.py:MANUAL_PLAYER_ALIASES`.
 
 **Read-only SQL enforcement** — `execute_query()` blocks INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/ATTACH. Only SELECT and WITH (CTEs) are allowed. Never relax this.
 
-**Gemini prompt engineering** — `ai_engine.py:build_prompt()` receives the multi-table schema dict and injects join guidance, cricket formulas, and PostgreSQL-specific syntax rules. Changes here directly affect query quality.
+**Gemini prompt engineering** — `core/ai_engine.py:build_prompt()` receives the multi-table schema dict and injects join guidance, cricket formulas, and PostgreSQL-specific syntax rules. Changes here directly affect query quality.
 
 ## Database Schema (Supabase / PostgreSQL)
 

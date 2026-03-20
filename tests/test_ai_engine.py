@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai_engine import _clean_sql, build_prompt, generate_sql
+from core.ai_engine import _clean_sql, build_prompt, generate_sql
 from config import GEMINI_MODEL
 
 
@@ -60,8 +60,8 @@ def test_generate_sql_raises_without_schema():
 def test_generate_sql_returns_select(sample_schema):
     mock_response = MagicMock()
     mock_response.text = "SELECT batter, SUM(runs_batter) FROM deliveries GROUP BY batter"
-    with patch("ai_engine.genai.configure"), \
-         patch("ai_engine.genai.GenerativeModel") as mock_model_cls:
+    with patch("core.ai_engine.genai.configure"), \
+         patch("core.ai_engine.genai.GenerativeModel") as mock_model_cls:
         mock_model_cls.return_value.generate_content.return_value = mock_response
         sql = generate_sql("top run scorers", sample_schema, api_key="fake-key")
     assert sql.strip().lower().startswith("select")
@@ -70,8 +70,8 @@ def test_generate_sql_returns_select(sample_schema):
 def test_generate_sql_raises_on_non_select(sample_schema):
     mock_response = MagicMock()
     mock_response.text = "I cannot generate that query."
-    with patch("ai_engine.genai.configure"), \
-         patch("ai_engine.genai.GenerativeModel") as mock_model_cls:
+    with patch("core.ai_engine.genai.configure"), \
+         patch("core.ai_engine.genai.GenerativeModel") as mock_model_cls:
         mock_model_cls.return_value.generate_content.return_value = mock_response
         with pytest.raises(ValueError, match="SELECT"):
             generate_sql("drop all tables", sample_schema, api_key="fake-key")
@@ -80,8 +80,8 @@ def test_generate_sql_raises_on_non_select(sample_schema):
 def test_generate_sql_uses_configured_model(sample_schema):
     mock_response = MagicMock()
     mock_response.text = "SELECT 1"
-    with patch("ai_engine.genai.configure"), \
-         patch("ai_engine.genai.GenerativeModel") as mock_model_cls:
+    with patch("core.ai_engine.genai.configure"), \
+         patch("core.ai_engine.genai.GenerativeModel") as mock_model_cls:
         mock_model_cls.return_value.generate_content.return_value = mock_response
         generate_sql("test", sample_schema, api_key="fake-key")
     mock_model_cls.assert_called_once_with(model_name=GEMINI_MODEL)

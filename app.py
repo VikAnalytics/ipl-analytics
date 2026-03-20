@@ -13,8 +13,8 @@ logging.basicConfig(
 import pandas as pd
 import streamlit as st
 
-from ai_engine import generate_sql
-from database import (
+from core.ai_engine import generate_sql
+from core.database import (
     execute_query,
     get_dataset_stats,
     get_player_alias_map,

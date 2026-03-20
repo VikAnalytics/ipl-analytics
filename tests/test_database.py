@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from database import _validate_sql, execute_query
+from core.database import _validate_sql, execute_query
 
 
 # ── _validate_sql ──────────────────────────────────────────────────────────────
@@ -55,11 +55,11 @@ def test_execute_query_blocks_write_operations(sql):
 
 def test_execute_query_returns_dataframe():
     mock_df = pd.DataFrame({"batter": ["V Kohli"], "runs": [600]})
-    with patch("database._connect") as mock_connect:
+    with patch("core.database._connect") as mock_connect:
         mock_conn = MagicMock()
         mock_connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_connect.return_value.__exit__ = MagicMock(return_value=False)
-        with patch("database.pd.read_sql_query", return_value=mock_df):
+        with patch("core.database.pd.read_sql_query", return_value=mock_df):
             result = execute_query("SELECT batter, SUM(runs_batter) AS runs FROM deliveries GROUP BY batter", database_url="mock://")
     assert isinstance(result, pd.DataFrame)
     assert len(result) == 1
