@@ -20,7 +20,7 @@ MANUAL_PLAYER_ALIASES = {
 
 
 def _connect(database_url: str):
-    return psycopg2.connect(database_url, connect_timeout=10)
+    return psycopg2.connect(database_url, connect_timeout=10, sslmode="require")
 
 
 def _normalize_player_name(name: str) -> str:

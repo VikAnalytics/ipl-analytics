@@ -2,26 +2,36 @@
 
 ## Project Overview
 
-AI-powered cricket analytics platform. Converts natural-language questions to SQL, executes against ball-by-ball IPL data (2008–2025), and visualizes results in Streamlit. Uses Google Gemini 2.5 Flash for NL-to-SQL.
+AI-powered cricket analytics platform. Converts natural-language questions to SQL, executes against ball-by-ball IPL data (2008–2025), and returns results via a FastAPI backend + single-page HTML frontend. Uses Google Gemini 2.5 Flash for NL-to-SQL. Deployed on Vercel.
 
 ## Stack
 
 | Layer | Technology |
 |-------|-----------|
-| UI | Streamlit |
+| UI | Vanilla HTML/CSS/JS (`index.html`) — single file, no build step |
+| API | FastAPI (`server.py`) — REST + AI endpoints |
 | AI Engine | Google Gemini 2.5 Flash (`google-generativeai`) |
-| Database | Supabase / PostgreSQL (`psycopg2-binary`) |
+| Database | Supabase / PostgreSQL (`psycopg2-binary`) via connection pooler |
 | Data | Pandas (query results from Supabase) |
-| Python | 3.9 |
+| Python | 3.12 (Vercel runtime) |
+| Deployment | Vercel (`vercel.json`, entry point `api/index.py`) |
 
 ## File Map
 
 ```
-app.py                    Main Streamlit entry point — UI, chat, chart rendering, session state
+server.py                 FastAPI app — all REST endpoints, rate limiting, security headers
+index.html                Single-page frontend — hero stats, champions, AI query, API explorer
+api/
+  index.py                Vercel entry point — imports FastAPI app from server.py
+vercel.json               Vercel routing — all requests → /api/index
+requirements.txt          Production deps (no Streamlit/pytest/uvicorn)
+requirements-dev.txt      Dev deps — extends requirements.txt + streamlit, pytest, uvicorn
+.vercelignore             Excludes secrets.toml, .venv, tests from Vercel deploys
 config.py                 All config — Gemini model, prompt tables, prompt template strings
 core/
-  database.py             Supabase connection, query execution, player alias normalization
+  database.py             Supabase connection (pooler, SSL, sslmode=require), query execution, alias normalization
   ai_engine.py            Gemini prompt construction and SQL generation
+app.py                    Legacy Streamlit entry point (local dev only)
 tests/
   conftest.py             Shared fixtures
   test_database.py        SQL validation and execute_query tests
@@ -50,9 +60,9 @@ Key tables:
 
 | Table | Rows | Key Columns |
 |-------|------|-------------|
-| `deliveries` | 278,205 | `match_id`, `innings_id`, `over_number` (1-idx), `batter`, `bowler`, `runs_batter`, `runs_total`, `is_wicket`, `wicket_kind`, `wicket_player_out`, `phase`, `extras_wides`, `extras_noballs` |
-| `matches` | 1,169 | `match_id`, `season`, `venue`, `city`, `match_date`, `team1`, `team2`, `outcome_winner`, `outcome_by_runs`, `outcome_by_wickets` |
-| `players` | 925 | `player_key`, `player_name`, `full_name`, `nationality`, `batting_style`, `bowling_style`, `playing_role` |
+| `deliveries` | 282,974 | `match_id`, `innings_id`, `over_number` (1-idx), `batter`, `bowler`, `runs_batter`, `runs_total`, `is_wicket`, `wicket_kind`, `wicket_player_out`, `phase`, `extras_wides`, `extras_noballs` |
+| `matches` | 1,190 | `match_id`, `season`, `venue`, `city`, `match_date`, `team1`, `team2`, `outcome_winner`, `outcome_by_runs`, `outcome_by_wickets` |
+| `players` | 945 | `player_key`, `player_name`, `full_name`, `nationality`, `batting_style`, `bowling_style`, `playing_role` |
 | `innings` | 2,365 | `innings_id`, `match_id`, `innings_number`, `team`, `target_runs`, `is_super_over` |
 
 Primary join: `deliveries.match_id → matches.match_id` (needed for season/venue/outcome filters)
@@ -69,17 +79,25 @@ Primary join: `deliveries.match_id → matches.match_id` (needed for season/venu
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 # Create .streamlit/secrets.toml:
 # GEMINI_API_KEY="your_key_here"
-# SUPABASE_DATABASE_URL="postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres"
-streamlit run app.py
+# SUPABASE_DATABASE_URL="postgresql://postgres.[ref]:[password]@[region].pooler.supabase.com:6543/postgres"
+uvicorn server:app --reload          # FastAPI at http://localhost:8000
+# or: streamlit run app.py           # Legacy Streamlit UI
 ```
 
-## Deployment (Streamlit Cloud)
+## Deployment (Vercel)
 
-- Secrets panel: set `GEMINI_API_KEY` and `SUPABASE_DATABASE_URL`
-- No CSV or SQLite file needed — all data is in Supabase
+- Project: `vikanalytics-projects/ipl-master` → https://ipl-master.vercel.app
+- Entry point: `api/index.py` imports `app` from `server.py`; `vercel.json` routes all traffic there
+- **Use the Supabase connection pooler URL** (not the direct `db.*.supabase.co` URL) — Vercel's network resolves the direct host to IPv6 only, which is blocked
+  - Get from: Supabase dashboard → Settings → Database → Connection Pooling → Transaction mode
+  - Format: `postgresql://postgres.[ref]:[password]@aws-[n]-[region].pooler.supabase.com:6543/postgres`
+- Env vars set via `vercel env add`: `GEMINI_API_KEY`, `SUPABASE_DATABASE_URL`
+- Env var precedence: `os.getenv()` first, then `.streamlit/secrets.toml` (local fallback)
+- `.vercelignore` excludes `secrets.toml`, `.venv`, `tests/` from deploys
+- Redeploy: `vercel --prod`
 
 ## Dataset
 
@@ -87,7 +105,7 @@ The dataset is **static** — IPL 2008–2025 ball-by-ball data. It will not be 
 
 ## Sensitive Files (never commit)
 
-- `.streamlit/secrets.toml` — Gemini API key
+- `.streamlit/secrets.toml` — API keys and DB URL (also excluded from Vercel via `.vercelignore`)
 - `cricket.db` — generated artifact
 - `data.csv` — large binary, host externally for cloud deploys
 
@@ -104,8 +122,8 @@ See the section below for prioritized upgrade paths.
 | # | Item |
 |---|------|
 | 1 | Pin dependency versions — all packages pinned in `requirements.txt` |
-| 2 | Query timeout — `connect_timeout=10` in `core/database.py:_connect()` |
-| 3 | Rate-limit Gemini calls — 20 queries/session, counter shown in sidebar (`app.py:QUERY_LIMIT`) |
+| 2 | Query timeout — `connect_timeout=10` + `sslmode=require` in `core/database.py:_connect()` |
+| 3 | Rate-limit AI calls — 20 req/min per IP in `server.py:_check_rate_limit()` |
 | 4 | Migrate to PostgreSQL — on Supabase/psycopg2, SQLite removed |
 | 5 | Remove flat files — data lives in Supabase, no CSV/DB artifacts |
 | 6 | Composite indexes — run in Supabase SQL editor (see below) |
@@ -115,7 +133,11 @@ See the section below for prioritized upgrade paths.
 | 10 | Test suite — 30 tests across `tests/` (database, ai_engine, aliases) |
 | 11 | Separate config — `config.py` holds model name and all prompt text |
 | 12 | PostgreSQL migration — done (see #4) |
-| 15 | Dataset scope in UI — sidebar caption + AI query counter |
+| 15 | Dataset scope in UI — live counts fetched from `/api/stats` on page load |
+| 16 | FastAPI backend — `server.py` replaces Streamlit for production; HTML frontend in `index.html` |
+| 17 | Vercel deployment — `vercel.json` + `api/index.py`; Supabase pooler for IPv4 compatibility |
+| 18 | Security hardening — XSS escaping in table render, generic 500 errors, security headers middleware, question length cap (500 chars), env-var-first secret precedence |
+| 19 | Dynamic data — champions section and hero stats fetched live from DB, no hardcoded counts |
 
 ## Composite Index SQL (run once in Supabase SQL Editor)
 
@@ -137,7 +159,10 @@ CREATE INDEX IF NOT EXISTS idx_matches_venue            ON matches(venue);
 ## Remaining (P3 — Long-term)
 
 ### 13. Async Gemini calls
-`generate_sql()` is synchronous and blocks the Streamlit event loop. Use `asyncio` + `google.generativeai.GenerativeModel.generate_content_async()` to keep the UI responsive during long model calls.
+`generate_sql()` is synchronous and blocks the FastAPI event loop during AI queries. Use `asyncio.to_thread()` or `google.generativeai.GenerativeModel.generate_content_async()` to avoid blocking other requests.
 
-### 14. Upgrade Python to 3.12
-Python 3.9 EOL is October 2025. Streamlit Cloud already supports 3.12. Upgrading unlocks performance improvements and security patches with no breaking changes for this codebase.
+### 14. Python version — resolved
+Vercel runtime uses Python 3.12 automatically. No action needed.
+
+### 20. Persistent rate limiting
+Current rate limiter is in-memory per Vercel function instance — resets on cold start, not shared across instances. For stricter enforcement use Vercel KV or Upstash Redis.
