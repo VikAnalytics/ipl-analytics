@@ -46,7 +46,7 @@ if _secrets_path.exists():
 
 
 def get_secret(key: str) -> str:
-    return os.getenv(key) or _secrets.get(key, "")
+    return (os.getenv(key) or _secrets.get(key, "")).strip()
 
 
 GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
