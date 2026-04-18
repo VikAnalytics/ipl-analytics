@@ -284,30 +284,6 @@
     .team-years-lbl { font-size: clamp(.65rem, 1.2vw, .78rem); color: rgba(255,255,255,.55); margin-top: .3rem; letter-spacing: .04em; }
     .team-count-lbl { font-family: 'Bebas Neue', sans-serif; font-size: clamp(.85rem, 1.8vw, 1.05rem); letter-spacing: .1em; color: var(--gold); margin-top: .45rem; }
 
-    /* ── DATA PILLARS ────────────────────────────────────── */
-    #data-section { background: var(--navy); }
-    .pillars { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; margin-top: 4rem; border: 1px solid rgba(255,255,255,.06); }
-    .pillar { padding: 2.5rem 2rem; border-right: 1px solid rgba(255,255,255,.06); transition: background .3s; }
-    .pillar:last-child { border-right: none; }
-    .pillar:hover { background: rgba(255,255,255,.025); }
-    .pillar-num { font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem,5vw,4.5rem); color: var(--gold); line-height: 1; }
-    .pillar-lbl { font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: .5rem; }
-    .pillar-desc { font-size: .85rem; color: rgba(123,140,176,.6); margin-top: .4rem; line-height: 1.5; }
-
-    /* ── PLATFORM ────────────────────────────────────────── */
-    #platform { background: #030514; }
-    .platform-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; margin-top: 4rem; }
-    .feat-list { display: flex; flex-direction: column; }
-    .feat {
-      display: grid; grid-template-columns: 3rem 1fr; gap: 1.25rem; align-items: start;
-      padding: 1.8rem 0; border-bottom: 1px solid rgba(255,255,255,.055);
-      transition: opacity .3s; opacity: .55;
-    }
-    .feat:hover { opacity: 1; }
-    .feat:first-child { border-top: 1px solid rgba(255,255,255,.055); }
-    .feat-n { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: rgba(201,162,39,.28); line-height: 1; }
-    .feat-ttl { font-weight: 600; font-size: 1rem; color: var(--white); margin-bottom: .4rem; }
-    .feat-dsc { font-size: .87rem; color: var(--muted); line-height: 1.65; }
     .terminal {
       background: #060A20; border: 1px solid rgba(255,255,255,.08);
       border-radius: 14px; overflow: hidden;
@@ -760,24 +736,6 @@
       line-height: 1.6;
     }
 
-    /* ── CTA ─────────────────────────────────────────────── */
-    #cta { background: linear-gradient(140deg, #080F38 0%, #04071A 100%); text-align: center; position: relative; overflow: hidden; }
-    .cta-glow { position: absolute; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle, rgba(201,162,39,.1) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
-    .cta-inner { position: relative; z-index: 1; }
-    .cta-t { font-family: 'Bebas Neue', sans-serif; font-size: clamp(3.5rem,10vw,9rem); line-height: .88; color: var(--white); margin-bottom: 1.8rem; }
-    .cta-t span { color: var(--gold); }
-    .cta-body { font-family: 'Fraunces', serif; font-style: italic; font-size: clamp(1rem,2.2vw,1.35rem); color: var(--dim); max-width: 420px; margin: 0 auto 3rem; line-height: 1.6; }
-    .cta-btn {
-      display: inline-flex; align-items: center; gap: .75rem;
-      background: var(--gold); color: #04071A;
-      font-family: 'Outfit', sans-serif; font-weight: 700;
-      font-size: .95rem; letter-spacing: .05em; text-transform: uppercase;
-      padding: 1rem 2.8rem; border-radius: 6px; text-decoration: none;
-      box-shadow: 0 10px 40px rgba(201,162,39,.28);
-      transition: transform .22s, box-shadow .22s, background .22s;
-    }
-    .cta-btn:hover { transform: translateY(-4px); box-shadow: 0 20px 60px rgba(201,162,39,.42); background: var(--gold-lt); }
-    .cta-note { margin-top: 1.2rem; font-size: .75rem; letter-spacing: .08em; color: var(--muted); opacity: .6; }
 
     /* ── FOOTER ──────────────────────────────────────────── */
     footer {
@@ -822,80 +780,12 @@
     @keyframes bailFly  { to { transform: rotate(-60deg) translate(18px,-22px); opacity:0; } }
     @keyframes bailFly2 { to { transform: rotate(45deg)  translate(-8px,-18px); opacity:0; } }
 
-    /* Wagon wheel host */
-    #data-section { position: relative; overflow: hidden; }
-
-    /* ── SCROLL REVEAL ───────────────────────────────────── */
+/* ── SCROLL REVEAL ───────────────────────────────────── */
     .r { opacity: 0; transform: translateY(24px); transition: opacity .75s ease-out, transform .75s ease-out; }
     .r.on { opacity: 1; transform: none; }
     .r.d1 { transition-delay: .1s; } .r.d2 { transition-delay: .2s; }
     .r.d3 { transition-delay: .3s; } .r.d4 { transition-delay: .4s; }
 
-    /* ── SCROLL IMAGE SEQUENCE ──────────────────────────── */
-    .seq-outer {
-      max-width: 960px;
-      margin: 0 auto;
-    }
-    .seq-scroller {
-      position: relative;
-      overflow-y: scroll;
-      overflow-x: hidden;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      border-radius: 16px;
-      border: 1px solid rgba(201,162,39,0.15);
-      background: #010308;
-      cursor: ns-resize;
-    }
-    .seq-scroller::-webkit-scrollbar { display: none; }
-    .seq-sticky-wrap {
-      position: sticky;
-      top: 0;
-      width: 100%;
-      overflow: hidden;
-    }
-    .seq-canvas {
-      display: block;
-      width: 100%;
-      /* height set via JS / --seq-h */
-    }
-    .seq-hud {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      padding: 0.9rem 1.4rem;
-      background: linear-gradient(to top, rgba(4,7,26,0.7) 0%, transparent 100%);
-      pointer-events: none;
-    }
-    .seq-frame-lbl {
-      display: block;
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: rgba(201,162,39,0.75);
-      margin-bottom: 0.45rem;
-    }
-    .seq-prog-bar {
-      height: 2px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 1px;
-      overflow: hidden;
-    }
-    .seq-prog-fill {
-      height: 100%;
-      background: var(--gold);
-      width: 0%;
-      will-change: width;
-    }
-    .seq-spacer { pointer-events: none; }
-    .seq-hint {
-      text-align: center;
-      font-size: 0.78rem;
-      color: var(--muted);
-      letter-spacing: 0.1em;
-      margin-top: 1.1rem;
-    }
-    .seq-hint svg { vertical-align: middle; margin-right: 0.35rem; opacity: 0.6; }
 
     /* ── CINEMATIC SEQUENCE (Apple-style) ───────────────── */
     .seq-cinematic {
@@ -975,10 +865,8 @@
 
     /* ── RESPONSIVE ──────────────────────────────────────── */
     @media (max-width: 820px) {
-      .platform-layout { grid-template-columns: 1fr; gap: 2.5rem; }
       .champ-row.row-a { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important; }
       .champ-row.row-a .team-card { min-height: 180px !important; }
-      .pillars { grid-template-columns: 1fr 1fr; }
       nav .nav-links { display: none; }
     }
     @media (max-width: 480px) {
@@ -1497,88 +1385,8 @@ fetch('/api/stats')
     const inline = document.getElementById('stat-deliveries-inline');
     if (inline) inline.textContent = fmtK(s.deliveries);
 
-    [
-      {num: fmtK(s.deliveries),          lbl:'Deliveries', desc:'Every ball bowled in IPL history'},
-      {num: s.matches.toLocaleString(),  lbl:'Matches',    desc:'Complete match records'},
-      {num: '9',                          lbl:'Tables',     desc:'Normalized Supabase PostgreSQL schema'},
-      {num: s.seasons,                   lbl:'Seasons',    desc:'Years of continuous data coverage'},
-    ].forEach(p => {
-      document.getElementById('pillars').insertAdjacentHTML('beforeend',
-        `<div class="pillar">
-          <div class="pillar-num">${p.num}</div>
-          <div class="pillar-lbl">${p.lbl}</div>
-          <div class="pillar-desc">${p.desc}</div>
-        </div>`);
-    });
-  })
-  .catch(() => {
-    // fallback: render pillars with dashes if stats unavailable
-    ['Deliveries','Matches','Tables','Seasons'].forEach(lbl => {
-      document.getElementById('pillars').insertAdjacentHTML('beforeend',
-        `<div class="pillar"><div class="pillar-num">—</div><div class="pillar-lbl">${lbl}</div></div>`);
-    });
   });
 
-/* ─── Platform features ──────────────────────────────────── */
-[
-  {n:'01',t:'AI Analyst',      d:'Type any cricket question. Gemini 2.5 Flash converts it to SQL and returns live results instantly.'},
-  {n:'02',t:'SQL Studio',      d:'Full schema access — write raw PostgreSQL directly against the Supabase database.'},
-  {n:'03',t:'Visual Analytics',d:'Bar, line, and scatter charts auto-generated from every query result. CSV export included.'},
-  {n:'04',t:'Player Aliases',  d:'"Virat Kohli" resolves to the exact database key automatically. 925 players covered.'},
-].forEach(f => {
-  document.getElementById('feat-list')?.insertAdjacentHTML('beforeend',
-    `<div class="feat"><div class="feat-n">${f.n}</div><div>
-      <div class="feat-ttl">${f.t}</div>
-      <div class="feat-dsc">${f.d}</div>
-    </div></div>`);
-});
-
-/* ─── Terminal mock ──────────────────────────────────────── */
-const questions = [
-  'Who are the top 10 run scorers of all time?',
-  'Best death-over bowlers since 2018',
-  "Virat Kohli's year-on-year runs",
-];
-const termQ = document.getElementById('term-q');
-let qi=0,ci=0,fwd=true;
-function type(){
-  if (!termQ) return;
-  const q=questions[qi];
-  if(fwd){
-    if(ci<=q.length){
-      termQ.innerHTML=q.slice(0,ci++)+'<span class="term-cursor"></span>';
-      setTimeout(type,ci<=q.length?55:1800);
-      if(ci===q.length+1){
-        setTimeout(()=>{
-          document.getElementById('term-response').style.opacity='1';
-          document.querySelectorAll('.bar-fill').forEach(el=>el.classList.add('go'));
-        },600);
-      }
-    } else { fwd=false; setTimeout(type,2200); }
-  } else {
-    if(ci>0){
-      termQ.innerHTML=q.slice(0,--ci)+'<span class="term-cursor"></span>';
-      if(ci===0){
-        document.getElementById('term-response').style.opacity='0';
-        document.querySelectorAll('.bar-fill').forEach(el=>el.classList.remove('go'));
-      }
-      setTimeout(type,22);
-    } else { fwd=true; qi=(qi+1)%questions.length; setTimeout(type,400); }
-  }
-}
-type();
-
-const mockPlayers=[
-  {n:'V Kohli',  v:7263,p:1.00},{n:'RG Sharma',v:6211,p:.86},
-  {n:'DA Warner',v:5881,p:.81},{n:'S Dhawan', v:6244,p:.86},
-  {n:'AB de V.', v:5162,p:.71},
-];
-{ const _bc = document.getElementById('bar-chart'); if (_bc) _bc.innerHTML=mockPlayers.map((p,i)=>
-  `<div class="bar-row">
-    <div class="bar-lbl">${p.n}</div>
-    <div class="bar-track"><div class="bar-fill" style="width:${p.p*100}%;transition-delay:${i*.12}s"></div></div>
-    <div class="bar-val">${(p.v/1000).toFixed(1)}K</div>
-  </div>`).join(''); }
 
 /* ─── Analytics section ──────────────────────────────────── */
 const CHIPS = [
@@ -2064,8 +1872,6 @@ function downloadCSV(columns, rows) {
    CRICKET DYNAMICS
    1. Floating cricket ball  — hero canvas, mouse attraction
    2. Particle trail         — emits from ball on move
-   3. Wagon wheel            — SVG background in data section
-   4. Pillar counters        — numbers count up on viewport entry
    ═══════════════════════════════════════════════════════════ */
 
 /* ── 1+2: Interactive cricket scene — ball + batsman ────────── */
@@ -2306,124 +2112,6 @@ function downloadCSV(columns, rows) {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-})();
-
-/* ── 3: Wagon wheel SVG background ──────────────────────────── */
-(function() {
-  const section = document.getElementById('data-section');
-  if (!section) return;
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '-1 -1 2 2');
-  svg.style.cssText = [
-    'position:absolute', 'top:50%', 'right:-8%',
-    'transform:translateY(-50%)',
-    'width:min(700px,95vw)', 'height:min(700px,95vw)',
-    'pointer-events:none', 'opacity:0',
-    'transition:opacity 1.2s ease',
-  ].join(';');
-  section.appendChild(svg);
-
-  const ns = 'http://www.w3.org/2000/svg';
-  const mk = (tag, attrs) => {
-    const el = document.createElementNS(ns, tag);
-    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
-    return el;
-  };
-
-  // Outer boundary
-  svg.appendChild(mk('circle', {cx:0,cy:0,r:.95,stroke:'#C9A227','stroke-width':'.018',fill:'none',opacity:'.5'}));
-  // 30-yard circle
-  svg.appendChild(mk('circle', {cx:0,cy:0,r:.5,stroke:'#C9A227','stroke-width':'.012',fill:'none',opacity:'.35','stroke-dasharray':'.04 .03'}));
-  // Pitch rect
-  svg.appendChild(mk('rect', {x:'-.04',y:'-.18',width:'.08',height:'.36',fill:'#C9A227',opacity:'.2',rx:'.01'}));
-  // Crease lines
-  svg.appendChild(mk('line', {x1:'-.06',y1:'-.13',x2:'.06',y2:'-.13',stroke:'#C9A227','stroke-width':'.008',opacity:'.4'}));
-  svg.appendChild(mk('line', {x1:'-.06',y1:'.13', x2:'.06',y2:'.13', stroke:'#C9A227','stroke-width':'.008',opacity:'.4'}));
-
-  // Shot lines (wagon wheel)
-  const shots = [
-    {a:18,l:.90},{a:42,l:.75},{a:-12,l:.88},{a:68,l:.65},{a:-38,l:.82},
-    {a:95,l:.58},{a:-65,l:.72},{a:130,l:.5},{a:-100,l:.68},{a:158,l:.44},
-    {a:8,l:.80},{a:-28,l:.86},{a:55,l:.70},{a:115,l:.52},{a:-55,l:.76},
-    {a:175,l:.42},{a:-140,l:.55},{a:200,l:.48},{a:32,l:.68},{a:-82,l:.60},
-  ];
-
-  const lines = shots.map((s, i) => {
-    const rad = s.a * Math.PI / 180;
-    const x2 = (Math.sin(rad) * s.l).toFixed(4);
-    const y2 = (-Math.cos(rad) * s.l).toFixed(4);
-    const line = mk('line', {
-      x1:0, y1:0, x2, y2,
-      stroke:'#C9A227', 'stroke-width':'.014',
-      opacity:'0', 'stroke-linecap':'round',
-    });
-    line.style.transition = `opacity 0.35s ${i * 0.06}s ease`;
-    svg.appendChild(line);
-    return line;
-  });
-
-  // Fielder dots
-  const fielders = [
-    {a:0,d:.92},{a:45,d:.88},{a:-45,d:.88},{a:90,d:.82},{a:-90,d:.82},
-    {a:135,d:.78},{a:-135,d:.78},{a:180,d:.72},{a:22,d:.52},{a:-22,d:.52},
-    {a:65,d:.48},
-  ];
-  fielders.forEach(f => {
-    const rad = f.a * Math.PI / 180;
-    const cx = (Math.sin(rad) * f.d).toFixed(4);
-    const cy = (-Math.cos(rad) * f.d).toFixed(4);
-    svg.appendChild(mk('circle', {cx, cy, r:'.022', fill:'#C9A227', opacity:'.35'}));
-  });
-
-  // Animate in on scroll
-  const obs = new IntersectionObserver(([e]) => {
-    if (e.isIntersecting) {
-      svg.style.opacity = '.07';
-      setTimeout(() => lines.forEach(l => l.style.opacity = '1'), 300);
-      obs.disconnect();
-    }
-  }, { threshold: 0.2 });
-  obs.observe(section);
-})();
-
-/* ── 4: Pillar number counters ───────────────────────────────── */
-(function() {
-  const pillars = [
-    { el: null, raw: 278205, fmt: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v.toLocaleString() },
-    { el: null, raw: 1169,   fmt: v => v.toLocaleString() },
-    { el: null, raw: 9,      fmt: v => String(v) },
-    { el: null, raw: 18,     fmt: v => String(v) },
-  ];
-
-  document.querySelectorAll('.pillar-num').forEach((el, i) => {
-    if (pillars[i]) pillars[i].el = el;
-  });
-
-  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
-
-  function animateCount(pillar) {
-    const { el, raw, fmt } = pillar;
-    if (!el) return;
-    const dur = 1600;
-    const start = Date.now();
-    function tick() {
-      const t = Math.min((Date.now() - start) / dur, 1);
-      el.textContent = fmt(Math.round(easeOut(t) * raw));
-      if (t < 1) requestAnimationFrame(tick);
-      else el.textContent = fmt(raw);
-    }
-    tick();
-  }
-
-  const pillarsSection = document.getElementById('pillars');
-  const obs = new IntersectionObserver(([e]) => {
-    if (e.isIntersecting) {
-      pillars.forEach((p, i) => setTimeout(() => animateCount(p), i * 120));
-      obs.disconnect();
-    }
-  }, { threshold: 0.3 });
-  if (pillarsSection) obs.observe(pillarsSection);
 })();
 
 /* ── Scroll Image Sequence ───────────────────────────────── */
