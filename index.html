@@ -224,8 +224,6 @@
     .champ-note { font-size: 0.82rem; color: var(--muted); max-width: 260px; line-height: 1.6; text-align: right; }
     .champ-mosaic-wrap { display: flex; flex-direction: column; gap: 3px; }
     .champ-row { display: grid; gap: 3px; }
-    .champ-row.row-a { grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr; }
-    .champ-row.row-b { grid-template-columns: 1fr 1fr 1fr 1fr; }
     .champ-row.row-a .team-card { min-height: 320px; }
     .champ-row.row-b .team-card { aspect-ratio: 5/3; }
 
@@ -379,6 +377,52 @@
     }
     .q-btn:hover { background: var(--gold-lt); transform: translateY(-1px); }
     .q-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .q-mode-toggle { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    .q-mode-btn {
+      padding: .4rem 1.2rem; border-radius: 2rem; border: 1px solid rgba(201,162,39,.3);
+      background: transparent; color: var(--muted); font-size: .8rem; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: all .2s;
+    }
+    .q-mode-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
+    .q-form-sql { flex-direction: column; align-items: stretch; }
+    .q-sql-input {
+      width: 100%; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
+      border-radius: .75rem; color: var(--white); font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: .85rem; padding: 1rem 1.2rem; resize: vertical; outline: none;
+      transition: border-color .2s;
+    }
+    .q-sql-input:focus { border-color: rgba(201,162,39,.5); }
+    .q-sql-input::placeholder { color: var(--muted); opacity: .6; }
+    .q-form-sql .q-btn { margin-top: .75rem; align-self: flex-end; }
+
+    .schema-ref { margin-top: 1.2rem; border: 1px solid rgba(255,255,255,.08); border-radius: .75rem; overflow: hidden; }
+    .schema-ref-toggle {
+      width: 100%; display: flex; justify-content: space-between; align-items: center;
+      padding: .75rem 1.1rem; background: rgba(255,255,255,.03); border: none;
+      color: var(--muted); font-size: .8rem; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; cursor: pointer; transition: background .2s;
+    }
+    .schema-ref-toggle:hover { background: rgba(255,255,255,.06); }
+    .schema-chevron { transition: transform .25s; }
+    .schema-ref.open .schema-chevron { transform: rotate(180deg); }
+    .schema-body { padding: 1rem 1.1rem 1.2rem; }
+    .schema-tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; }
+    .schema-table-card {
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      border-radius: .5rem; padding: .75rem 1rem;
+    }
+    .schema-table-name {
+      font-family: 'JetBrains Mono', monospace; font-size: .8rem; font-weight: 700;
+      color: var(--gold); margin-bottom: .5rem;
+    }
+    .schema-col-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .schema-col {
+      font-family: 'JetBrains Mono', monospace; font-size: .7rem;
+      color: rgba(242,240,235,.55); background: rgba(255,255,255,.05);
+      border-radius: .25rem; padding: .15rem .4rem; cursor: pointer; transition: color .15s;
+    }
+    .schema-col:hover { color: var(--white); }
 
     .q-chips {
       display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.1rem;
@@ -787,11 +831,153 @@
     .r.d1 { transition-delay: .1s; } .r.d2 { transition-delay: .2s; }
     .r.d3 { transition-delay: .3s; } .r.d4 { transition-delay: .4s; }
 
+    /* ── SCROLL IMAGE SEQUENCE ──────────────────────────── */
+    .seq-outer {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .seq-scroller {
+      position: relative;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      border-radius: 16px;
+      border: 1px solid rgba(201,162,39,0.15);
+      background: #010308;
+      cursor: ns-resize;
+    }
+    .seq-scroller::-webkit-scrollbar { display: none; }
+    .seq-sticky-wrap {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      overflow: hidden;
+    }
+    .seq-canvas {
+      display: block;
+      width: 100%;
+      /* height set via JS / --seq-h */
+    }
+    .seq-hud {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 0.9rem 1.4rem;
+      background: linear-gradient(to top, rgba(4,7,26,0.7) 0%, transparent 100%);
+      pointer-events: none;
+    }
+    .seq-frame-lbl {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(201,162,39,0.75);
+      margin-bottom: 0.45rem;
+    }
+    .seq-prog-bar {
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+    .seq-prog-fill {
+      height: 100%;
+      background: var(--gold);
+      width: 0%;
+      will-change: width;
+    }
+    .seq-spacer { pointer-events: none; }
+    .seq-hint {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-top: 1.1rem;
+    }
+    .seq-hint svg { vertical-align: middle; margin-right: 0.35rem; opacity: 0.6; }
+
+    /* ── CINEMATIC SEQUENCE (Apple-style) ───────────────── */
+    .seq-cinematic {
+      position: relative;
+      /* height set by JS from data-scroll-height */
+    }
+    .seq-cin-canvas {
+      position: sticky;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: #000;
+    }
+    .seq-cin-hud {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      margin-top: -100vh;
+      height: 100vh;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2rem 3rem;
+    }
+    .seq-cin-lbl {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(201,162,39,0.8);
+      margin-bottom: 0.5rem;
+    }
+    .seq-cin-overlay {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .seq-cin-eyebrow {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.75rem;
+    }
+    .seq-cin-body {
+      font-size: 1rem;
+      color: rgba(242,240,235,0.6);
+      max-width: 480px;
+      line-height: 1.75;
+      margin-top: 1.1rem;
+    }
+    .seq-cin-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 8vw, 7rem);
+      line-height: 0.95;
+      color: var(--white);
+      text-shadow: 0 4px 40px rgba(0,0,0,0.6);
+    }
+    .seq-cin-bar {
+      height: 2px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 1px;
+      overflow: hidden;
+      max-width: 200px;
+    }
+    .seq-cin-fill {
+      height: 100%;
+      background: var(--gold);
+      width: 0%;
+      will-change: width;
+    }
+
     /* ── RESPONSIVE ──────────────────────────────────────── */
     @media (max-width: 820px) {
       .platform-layout { grid-template-columns: 1fr; gap: 2.5rem; }
-      .champ-row.row-a { grid-template-columns: 1fr 1fr 1fr 1fr; }
-      .champ-row.row-a .team-card:nth-child(n+5) { display: none; }
+      .champ-row.row-a { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important; }
+      .champ-row.row-a .team-card { min-height: 180px !important; }
       .pillars { grid-template-columns: 1fr 1fr; }
       nav .nav-links { display: none; }
     }
@@ -799,6 +985,7 @@
       .champ-row.row-b { grid-template-columns: 1fr 1fr; }
     }
   </style>
+  <link rel="stylesheet" href="/static/immersive.css">
 </head>
 <body>
 
@@ -806,9 +993,8 @@
 <nav id="nav">
   <div class="nav-logo">IPL <em>Analytics</em></div>
   <ul class="nav-links">
-    <li><a href="#champions">Champions</a></li>
-    <li><a href="#data-section">Data</a></li>
     <li><a href="#analyst">Analyst</a></li>
+    <li><a href="#champions">Champions</a></li>
     <li><a href="#api-docs">API</a></li>
   </ul>
   <a href="#analyst" class="nav-cta">Ask a Question →</a>
@@ -829,29 +1015,48 @@
   </div>
   <div class="hero-fade"></div>
   <div class="hero-content">
-    <div class="hero-eyebrow"><span class="line"></span>IPL Ball-by-Ball · 2008 – 2025</div>
-    <h1 class="hero-title">CRICKET<br><span class="g">INTEL</span><span class="o">.</span></h1>
-    <p class="hero-sub">Ask any question about eighteen seasons of Indian Premier League cricket. AI converts your words to data in seconds.</p>
-    <div class="hero-stats">
-      <div class="hstat">
-        <div class="hstat-num" id="stat-deliveries">—</div>
-        <div class="hstat-lbl">Deliveries</div>
+    <div class="hero-left">
+      <div class="hero-eyebrow"><span class="line"></span>IPL Ball-by-Ball · 2008 – 2025</div>
+      <h1 class="hero-title">CRICKET<br><span class="g">INTEL</span><span class="o">.</span></h1>
+      <p class="hero-sub">Ask any question about eighteen seasons of Indian Premier League cricket. AI converts your words to data in seconds.</p>
+      <div class="hero-stats">
+        <div class="hstat">
+          <div class="hstat-num" id="stat-deliveries">—</div>
+          <div class="hstat-lbl">Deliveries</div>
+        </div>
+        <div class="hstat-div"></div>
+        <div class="hstat">
+          <div class="hstat-num" id="stat-matches">—</div>
+          <div class="hstat-lbl">Matches</div>
+        </div>
+        <div class="hstat-div"></div>
+        <div class="hstat">
+          <div class="hstat-num" id="stat-seasons">—</div>
+          <div class="hstat-lbl">Seasons</div>
+        </div>
+        <div class="hstat-div"></div>
+        <div class="hstat">
+          <div class="hstat-num" id="stat-players">—</div>
+          <div class="hstat-lbl">Players</div>
+        </div>
       </div>
-      <div class="hstat-div"></div>
-      <div class="hstat">
-        <div class="hstat-num" id="stat-matches">—</div>
-        <div class="hstat-lbl">Matches</div>
-      </div>
-      <div class="hstat-div"></div>
-      <div class="hstat">
-        <div class="hstat-num" id="stat-seasons">—</div>
-        <div class="hstat-lbl">Seasons</div>
-      </div>
-      <div class="hstat-div"></div>
-      <div class="hstat">
-        <div class="hstat-num" id="stat-players">—</div>
-        <div class="hstat-lbl">Players</div>
-      </div>
+    </div>
+
+    <div class="hero-right">
+      <ul class="hero-features">
+        <li>
+          <span class="hf-label">Data</span>
+          <span class="hf-text">9 normalized tables — deliveries, matches, players, innings and more. Every ball since 2008.</span>
+        </li>
+        <li>
+          <span class="hf-label">Live</span>
+          <span class="hf-text">Queries run against PostgreSQL on Supabase in real time. No cached snapshots.</span>
+        </li>
+        <li>
+          <span class="hf-label">AI</span>
+          <span class="hf-text">Type plain English. Gemini 2.5 Flash writes the SQL and returns results in seconds.</span>
+        </li>
+      </ul>
     </div>
   </div>
   <div class="scroll-hint">
@@ -865,62 +1070,7 @@
   <div class="ticker-inner" id="ticker"></div>
 </div>
 
-<!-- CHAMPIONS -->
-<section class="section" id="champions">
-  <div class="champ-header r">
-    <div>
-      <div class="eyebrow">Hall of Champions</div>
-      <h2 class="sec-title">Title Holders</h2>
-    </div>
-    <p class="champ-note">Every franchise to lift the IPL trophy — ranked by titles, 2008–2024.</p>
-  </div>
-  <div class="champ-mosaic-wrap r d1">
-    <div class="champ-row row-a" id="row-a"></div>
-    <div class="champ-row row-b" id="row-b"></div>
-  </div>
-</section>
-
-<!-- DATA -->
-<section class="section" id="data-section">
-  <div class="r">
-    <div class="eyebrow">The Dataset</div>
-    <h2 class="sec-title">Built on<br>Complete Data</h2>
-    <p class="sec-body">Nine normalized Supabase tables. Every delivery, every wicket, every match — live via PostgreSQL.</p>
-  </div>
-  <div class="pillars r d2" id="pillars"></div>
-</section>
-
-<!-- PLATFORM -->
-<section class="section" id="platform">
-  <div class="r">
-    <div class="eyebrow">Platform</div>
-    <h2 class="sec-title">Ask. Analyze.<br>Discover.</h2>
-    <p class="sec-body">Natural language converted to precise SQL by Gemini 2.5 Flash — executed live, returned instantly.</p>
-  </div>
-  <div class="platform-layout">
-    <div class="feat-list r d1" id="feat-list"></div>
-    <div class="terminal r d2">
-      <div class="term-bar">
-        <div class="term-dot td-r"></div>
-        <div class="term-dot td-y"></div>
-        <div class="term-dot td-g"></div>
-        <div class="term-title-bar">IPL Analytics — AI Analyst</div>
-      </div>
-      <div class="term-body">
-        <div class="term-prompt">
-          <div class="term-avatar">U</div>
-          <div class="term-msg" id="term-q"><span class="term-cursor"></span></div>
-        </div>
-        <div class="term-response" id="term-response" style="opacity:0;transition:opacity .5s;">
-          <div class="term-r-lbl">Top Run Scorers — All Time</div>
-          <div id="bar-chart"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ANALYTICS -->
+<!-- AI ANALYST — product hero -->
 <section class="section" id="analyst">
   <div class="r">
     <div class="eyebrow">AI Analyst</div>
@@ -928,7 +1078,12 @@
     <p class="sec-body">Type a question in plain English. Gemini converts it to SQL, runs it against <span id="stat-deliveries-inline">278K</span> deliveries, and returns the answer.</p>
   </div>
 
-  <div class="q-wrap r d1">
+  <div class="q-mode-toggle r d1">
+    <button class="q-mode-btn active" id="mode-ai">AI</button>
+    <button class="q-mode-btn" id="mode-sql">SQL</button>
+  </div>
+
+  <div class="q-wrap r d1" id="q-wrap-ai">
     <div class="q-form">
       <input class="q-input" id="q-input" type="text"
         placeholder="e.g. Top 10 run scorers of all time…"
@@ -936,6 +1091,28 @@
       <button class="q-btn" id="q-btn">Ask →</button>
     </div>
     <div class="q-chips" id="q-chips"></div>
+  </div>
+
+  <div class="q-wrap r d1" id="q-wrap-sql" style="display:none;">
+    <div class="q-form q-form-sql">
+      <textarea class="q-sql-input" id="q-sql-input" rows="5"
+        placeholder="SELECT batter, SUM(runs_batter) AS runs&#10;FROM deliveries&#10;GROUP BY batter&#10;ORDER BY runs DESC&#10;LIMIT 10"
+        spellcheck="false"></textarea>
+      <button class="q-btn" id="q-sql-btn">Run →</button>
+    </div>
+    <div class="schema-ref" id="schema-ref">
+      <button class="schema-ref-toggle" id="schema-toggle">
+        <span>Schema Reference</span>
+        <svg class="schema-chevron" viewBox="0 0 16 16" fill="none" width="14" height="14">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="schema-body" id="schema-body" style="display:none;">
+        <div class="schema-tables" id="schema-tables">
+          <div style="color:var(--muted);font-size:.8rem;padding:.5rem">Loading schema…</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="results-box r d2" id="results-box">
@@ -977,6 +1154,38 @@
     </div>
   </div>
 </section>
+
+<!-- CINEMATIC — DATASET -->
+<section class="seq-cinematic"
+         data-images='["/static/seq/VK.jpg"]'
+         data-scroll-height="150"
+         data-opacity="0.45">
+  <canvas class="seq-cin-canvas"></canvas>
+  <div class="seq-cin-hud">
+    <div class="seq-cin-overlay">
+      <p class="seq-cin-eyebrow">Current Champions</p>
+      <h2 class="seq-cin-title">Royal Challengers<br>Bangalore</h2>
+    </div>
+    <span class="seq-cin-lbl"></span>
+    <div class="seq-cin-bar"><div class="seq-cin-fill"></div></div>
+  </div>
+</section>
+
+<!-- CHAMPIONS -->
+<section class="section" id="champions">
+  <div class="champ-header r">
+    <div>
+      <div class="eyebrow">Hall of Champions</div>
+      <h2 class="sec-title">Title Holders</h2>
+    </div>
+    <p class="champ-note">Every franchise to lift the IPL trophy — ranked by titles, 2008–2024.</p>
+  </div>
+  <div class="champ-mosaic-wrap r d1">
+    <div class="champ-row row-a" id="row-a"></div>
+    <div class="champ-row row-b" id="row-b"></div>
+  </div>
+</section>
+
 
 <!-- API DOCS -->
 <section class="section" id="api-docs">
@@ -1149,21 +1358,8 @@
   </div><!-- /api-layout -->
 </section>
 
+
 <!-- CTA -->
-<section class="section" id="cta">
-  <div class="cta-glow"></div>
-  <div class="cta-inner r">
-    <h2 class="cta-t">READY TO<br><span>EXPLORE?</span></h2>
-    <p class="cta-body">Eighteen seasons of ball-by-ball data, waiting for your question. No SQL knowledge needed.</p>
-    <a href="#analyst" class="cta-btn">
-      Start Asking
-      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-        <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
-      </svg>
-    </a>
-    <p class="cta-note">Powered by Google Gemini 2.5 Flash + Supabase PostgreSQL</p>
-  </div>
-</section>
 
 <!-- FOOTER -->
 <footer>
@@ -1217,7 +1413,7 @@ const TEAM_META = {
   'Punjab Kings':                {abbr:'PBKS', cls:'pbks', short:'Punjab Kings',          logo:'https://upload.wikimedia.org/wikipedia/en/d/d4/Punjab_Kings_Logo.svg'},
   'Kings XI Punjab':             {abbr:'KXIP', cls:'pbks', short:'Kings XI Punjab',       logo:''},
   'Lucknow Super Giants':        {abbr:'LSG',  cls:'lsg',  short:'Lucknow Super Giants',  logo:'https://upload.wikimedia.org/wikipedia/en/3/34/Lucknow_Super_Giants_Logo.svg'},
-  'Deccan Chargers':             {abbr:'DC2',  cls:'srh',  short:'Deccan Chargers',       logo:''},
+  'Deccan Chargers':             {abbr:'DC2',  cls:'srh',  short:'Deccan Chargers',       logo:'https://upload.wikimedia.org/wikipedia/en/a/a6/HyderabadDeccanChargers.png'},
 };
 
 function makeCard(t) {
@@ -1257,8 +1453,15 @@ fetch('/api/champions')
         logo:   meta.logo || '',
       };
     });
-    document.getElementById('row-a').innerHTML = champions.map(makeCard).join('');
-    document.getElementById('row-b').innerHTML = '';
+    const rowA = document.getElementById('row-a');
+    const rowB = document.getElementById('row-b');
+    const half = Math.ceil(champions.length / 2);
+    const top = champions.slice(0, half);
+    const bot = champions.slice(half);
+    rowA.innerHTML = top.map(makeCard).join('');
+    rowA.style.gridTemplateColumns = `repeat(${top.length}, 1fr)`;
+    rowB.innerHTML = bot.map(makeCard).join('');
+    rowB.style.gridTemplateColumns = `repeat(${bot.length}, 1fr)`;
   })
   .catch(() => {
     document.getElementById('row-a').innerHTML = '<p style="color:rgba(255,255,255,.4);padding:1rem">Could not load champions.</p>';
@@ -1323,7 +1526,7 @@ fetch('/api/stats')
   {n:'03',t:'Visual Analytics',d:'Bar, line, and scatter charts auto-generated from every query result. CSV export included.'},
   {n:'04',t:'Player Aliases',  d:'"Virat Kohli" resolves to the exact database key automatically. 925 players covered.'},
 ].forEach(f => {
-  document.getElementById('feat-list').insertAdjacentHTML('beforeend',
+  document.getElementById('feat-list')?.insertAdjacentHTML('beforeend',
     `<div class="feat"><div class="feat-n">${f.n}</div><div>
       <div class="feat-ttl">${f.t}</div>
       <div class="feat-dsc">${f.d}</div>
@@ -1339,6 +1542,7 @@ const questions = [
 const termQ = document.getElementById('term-q');
 let qi=0,ci=0,fwd=true;
 function type(){
+  if (!termQ) return;
   const q=questions[qi];
   if(fwd){
     if(ci<=q.length){
@@ -1369,12 +1573,12 @@ const mockPlayers=[
   {n:'DA Warner',v:5881,p:.81},{n:'S Dhawan', v:6244,p:.86},
   {n:'AB de V.', v:5162,p:.71},
 ];
-document.getElementById('bar-chart').innerHTML=mockPlayers.map((p,i)=>
+{ const _bc = document.getElementById('bar-chart'); if (_bc) _bc.innerHTML=mockPlayers.map((p,i)=>
   `<div class="bar-row">
     <div class="bar-lbl">${p.n}</div>
     <div class="bar-track"><div class="bar-fill" style="width:${p.p*100}%;transition-delay:${i*.12}s"></div></div>
     <div class="bar-val">${(p.v/1000).toFixed(1)}K</div>
-  </div>`).join('');
+  </div>`).join(''); }
 
 /* ─── Analytics section ──────────────────────────────────── */
 const CHIPS = [
@@ -1400,6 +1604,110 @@ CHIPS.forEach(c => {
 document.getElementById('q-btn').addEventListener('click', submitQuery);
 document.getElementById('q-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') submitQuery();
+});
+
+/* Mode toggle */
+document.getElementById('mode-ai').addEventListener('click', () => {
+  document.getElementById('mode-ai').classList.add('active');
+  document.getElementById('mode-sql').classList.remove('active');
+  document.getElementById('q-wrap-ai').style.display = '';
+  document.getElementById('q-wrap-sql').style.display = 'none';
+});
+document.getElementById('mode-sql').addEventListener('click', () => {
+  document.getElementById('mode-sql').classList.add('active');
+  document.getElementById('mode-ai').classList.remove('active');
+  document.getElementById('q-wrap-sql').style.display = '';
+  document.getElementById('q-wrap-ai').style.display = 'none';
+});
+
+/* Raw SQL submit */
+async function submitRawSql() {
+  const sql = document.getElementById('q-sql-input').value.trim();
+  if (!sql) return;
+
+  const resultsBox = document.getElementById('results-box');
+  const loadingBar = document.getElementById('loading-bar');
+  const resError   = document.getElementById('res-error');
+  const resTabs    = document.getElementById('res-tabs');
+  const btn        = document.getElementById('q-sql-btn');
+
+  resultsBox.classList.add('show');
+  loadingBar.style.display = 'flex';
+  resError.style.display   = 'none';
+  resTabs.style.display    = 'none';
+  btn.disabled             = true;
+
+  document.querySelectorAll('.res-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.res-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('.res-tab[data-panel="panel-table"]').classList.add('active');
+  document.getElementById('panel-table').classList.add('active');
+
+  try {
+    const resp = await fetch('/api/sql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sql }),
+    });
+    const data = await resp.json();
+    loadingBar.style.display = 'none';
+    if (!resp.ok) {
+      resError.style.display = 'flex';
+      document.getElementById('res-error-msg').textContent = data.detail || resp.statusText;
+    } else {
+      renderResults(data);
+    }
+  } catch (err) {
+    loadingBar.style.display = 'none';
+    resError.style.display = 'flex';
+    document.getElementById('res-error-msg').textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('q-sql-btn').addEventListener('click', submitRawSql);
+document.getElementById('q-sql-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitRawSql();
+});
+
+/* Schema reference */
+let schemaLoaded = false;
+document.getElementById('schema-toggle').addEventListener('click', () => {
+  const ref  = document.getElementById('schema-ref');
+  const body = document.getElementById('schema-body');
+  const open = ref.classList.toggle('open');
+  body.style.display = open ? '' : 'none';
+  if (open && !schemaLoaded) {
+    schemaLoaded = true;
+    fetch('/api/tables')
+      .then(r => r.json())
+      .then(data => {
+        const tables = data.tables;
+        document.getElementById('schema-tables').innerHTML = Object.entries(tables)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([tbl, cols]) => `
+            <div class="schema-table-card">
+              <div class="schema-table-name">${tbl}</div>
+              <div class="schema-col-list">
+                ${cols.map(c => `<span class="schema-col" title="Click to insert" data-col="${c}">${c}</span>`).join('')}
+              </div>
+            </div>`).join('');
+        // Click column to insert at cursor
+        document.querySelectorAll('.schema-col').forEach(el => {
+          el.addEventListener('click', () => {
+            const ta = document.getElementById('q-sql-input');
+            const s = ta.selectionStart, e2 = ta.selectionEnd;
+            const val = ta.value;
+            ta.value = val.slice(0, s) + el.dataset.col + val.slice(e2);
+            ta.selectionStart = ta.selectionEnd = s + el.dataset.col.length;
+            ta.focus();
+          });
+        });
+      })
+      .catch(() => {
+        document.getElementById('schema-tables').innerHTML =
+          '<div style="color:var(--muted);font-size:.8rem">Could not load schema.</div>';
+      });
+  }
 });
 
 /* Tab switching */
@@ -2003,6 +2311,7 @@ function downloadCSV(columns, rows) {
 /* ── 3: Wagon wheel SVG background ──────────────────────────── */
 (function() {
   const section = document.getElementById('data-section');
+  if (!section) return;
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '-1 -1 2 2');
@@ -2115,6 +2424,254 @@ function downloadCSV(columns, rows) {
     }
   }, { threshold: 0.3 });
   if (pillarsSection) obs.observe(pillarsSection);
+})();
+
+/* ── Scroll Image Sequence ───────────────────────────────── */
+(function () {
+  const PX_PER_FRAME_DEFAULT = 90;
+  const MAX_FRAMES = 65;
+
+  /* Draw a placeholder frame when no images are provided */
+  function drawPlaceholder(ctx, w, h, index, total) {
+    ctx.clearRect(0, 0, w, h);
+    // dark gradient bg
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, '#04071A');
+    bg.addColorStop(1, '#0A0F2E');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    // progress arc
+    const cx = w / 2, cy = h / 2, r = Math.min(w, h) * 0.22;
+    const progress = total > 1 ? index / (total - 1) : 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(201,162,39,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // fill arc
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+    ctx.strokeStyle = '#C9A227';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // frame number
+    ctx.fillStyle = '#F2F0EB';
+    ctx.font = `bold ${Math.round(r * 0.85)}px Bebas Neue, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(index + 1, cx, cy);
+
+    // label
+    ctx.fillStyle = 'rgba(123,140,176,0.8)';
+    ctx.font = `600 ${Math.round(r * 0.24)}px Outfit, sans-serif`;
+    ctx.letterSpacing = '0.14em';
+    ctx.fillText(`FRAME ${index + 1} / ${total}`, cx, cy + r * 1.5);
+
+    // subtle grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y < h; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  }
+
+  function initSequence(el) {
+    let images = [];
+    try { images = JSON.parse(el.dataset.images || '[]'); } catch (_) {}
+    images = images.slice(0, MAX_FRAMES);
+
+    const frameHeight = parseInt(el.dataset.frameHeight, 10) || 520;
+    const pxPerFrame  = parseInt(el.dataset.pxPerFrame,  10) || PX_PER_FRAME_DEFAULT;
+    const usePlaceholders = images.length === 0;
+    const frameCount = usePlaceholders ? MAX_FRAMES : images.length;
+
+    // Size the scroller
+    el.style.height = frameHeight + 'px';
+
+    // Canvas
+    const stickyWrap = el.querySelector('.seq-sticky-wrap');
+    const canvas     = el.querySelector('.seq-canvas');
+    const hud        = el.querySelector('.seq-hud');
+    const frameLbl   = el.querySelector('.seq-frame-lbl');
+    const progFill   = el.querySelector('.seq-prog-fill');
+    const spacer     = el.querySelector('.seq-spacer');
+
+    stickyWrap.style.height = frameHeight + 'px';
+    canvas.style.height     = frameHeight + 'px';
+    canvas.height           = frameHeight;
+    canvas.width            = el.clientWidth || 960;
+    spacer.style.height     = (frameCount * pxPerFrame) + 'px';
+
+    const ctx = canvas.getContext('2d');
+    let loaded = [];
+    let currentFrame = 0;
+
+    // Resize observer keeps canvas width in sync
+    new ResizeObserver(() => {
+      canvas.width = el.clientWidth;
+      renderFrame(currentFrame);
+    }).observe(el);
+
+    const failedFrames = new Set();
+
+    function renderFrame(idx) {
+      const i = Math.max(0, Math.min(idx, frameCount - 1));
+      const w = canvas.width, h = canvas.height;
+
+      if (usePlaceholders || failedFrames.has(i)) {
+        drawPlaceholder(ctx, w, h, i, frameCount);
+      } else {
+        const img = loaded[i];
+        if (img && img.complete && img.naturalWidth) {
+          ctx.clearRect(0, 0, w, h);
+          const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+          const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+          ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        } else {
+          // not loaded yet — show placeholder until ready
+          drawPlaceholder(ctx, w, h, i, frameCount);
+        }
+      }
+
+      const progress = frameCount > 1 ? i / (frameCount - 1) : 1;
+      frameLbl.textContent = `Frame ${i + 1} / ${frameCount}`;
+      progFill.style.width  = (progress * 100).toFixed(1) + '%';
+    }
+
+    if (usePlaceholders) {
+      renderFrame(0);
+    } else {
+      loaded = images.map((src, i) => {
+        const img = new Image();
+        img.onload  = () => { if (i === currentFrame) renderFrame(currentFrame); };
+        img.onerror = () => {
+          console.warn('[seq] failed to load frame', i, src);
+          failedFrames.add(i);
+          if (i === currentFrame) renderFrame(currentFrame);
+        };
+        img.src = src;
+        return img;
+      });
+      // Render frame 0 immediately — shows placeholder until img[0] loads
+      renderFrame(0);
+    }
+
+    // Scroll handler — instant frame update
+    el.addEventListener('scroll', () => {
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+      const progress = el.scrollTop / maxScroll;
+      const newFrame = Math.round(progress * (frameCount - 1));
+      if (newFrame !== currentFrame) {
+        currentFrame = newFrame;
+        renderFrame(currentFrame);
+      }
+    }, { passive: true });
+  }
+
+  document.querySelectorAll('.seq-scroller').forEach(initSequence);
+})();
+
+/* ── Cinematic Sequence (Apple-style window scroll) ─────── */
+(function () {
+  document.querySelectorAll('.seq-cinematic').forEach(el => {
+    let images = [];
+    try { images = JSON.parse(el.dataset.images || '[]'); } catch (_) {}
+    const scrollVh  = parseInt(el.dataset.scrollHeight, 10) || 400;
+    const imgOpacity = parseFloat(el.dataset.opacity) || 1;
+    const frameCount = images.length || 1;
+
+    el.style.height = scrollVh + 'vh';
+
+    const canvas  = el.querySelector('.seq-cin-canvas');
+    const lbl     = el.querySelector('.seq-cin-lbl');
+    const fill    = el.querySelector('.seq-cin-fill');
+    const ctx     = canvas.getContext('2d');
+
+    // Size canvas to device pixel ratio for crisp output
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = window.innerWidth  * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.scale(dpr, dpr);
+      renderFrame(currentFrame);
+    }
+
+    const loaded = [];
+    const failed = new Set();
+    let currentFrame = 0;
+
+    function drawCover(img) {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      ctx.clearRect(0, 0, vw, vh);
+      ctx.globalAlpha = imgOpacity;
+      const scale = Math.max(vw / img.naturalWidth, vh / img.naturalHeight);
+      const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+      ctx.drawImage(img, (vw - dw) / 2, (vh - dh) / 2, dw, dh);
+      ctx.globalAlpha = 1;
+    }
+
+    function drawPlaceholderCin(i) {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      ctx.clearRect(0, 0, vw, vh);
+      const bg = ctx.createLinearGradient(0, 0, 0, vh);
+      bg.addColorStop(0, '#04071A'); bg.addColorStop(1, '#0A0F2E');
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, vw, vh);
+      const r = Math.min(vw, vh) * 0.12;
+      const progress = frameCount > 1 ? i / (frameCount - 1) : 1;
+      ctx.beginPath();
+      ctx.arc(vw / 2, vh / 2, r, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+      ctx.strokeStyle = '#C9A227'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#F2F0EB';
+      ctx.font = `bold ${Math.round(r * 0.9)}px Bebas Neue, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(i + 1, vw / 2, vh / 2);
+    }
+
+    function renderFrame(i) {
+      i = Math.max(0, Math.min(i, frameCount - 1));
+      const img = loaded[i];
+      if (img && img.complete && img.naturalWidth && !failed.has(i)) {
+        drawCover(img);
+      } else {
+        drawPlaceholderCin(i);
+      }
+      const progress = frameCount > 1 ? i / (frameCount - 1) : 1;
+      if (lbl)  lbl.textContent  = `Frame ${i + 1} / ${frameCount}`;
+      if (fill) fill.style.width = (progress * 100).toFixed(1) + '%';
+    }
+
+    // Preload
+    images.forEach((src, i) => {
+      const img = new Image();
+      img.onload  = () => { if (i === currentFrame) renderFrame(currentFrame); };
+      img.onerror = () => { failed.add(i); if (i === currentFrame) renderFrame(currentFrame); };
+      img.src = src;
+      loaded[i] = img;
+    });
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+
+    // Window scroll drives frames
+    window.addEventListener('scroll', () => {
+      const rect      = el.getBoundingClientRect();
+      const sectionH  = el.offsetHeight;
+      const scrolled  = -rect.top;                        // px scrolled into section
+      const scrollable = sectionH - window.innerHeight;   // total usable scroll range
+      if (scrollable <= 0) return;
+      const progress  = Math.max(0, Math.min(1, scrolled / scrollable));
+      const newFrame  = Math.round(progress * (frameCount - 1));
+      if (newFrame !== currentFrame) {
+        currentFrame = newFrame;
+        renderFrame(currentFrame);
+      }
+    }, { passive: true });
+
+    renderFrame(0);
+  });
 })();
 </script>
 </body>

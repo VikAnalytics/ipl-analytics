@@ -13,6 +13,7 @@ import psycopg2
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from core.ai_engine import generate_sql
@@ -136,6 +137,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],   # read-only public data — open is fine; tighten if needed
@@ -216,6 +219,40 @@ async def ai_query(req: QueryRequest, request: Request) -> dict:
     except Exception as exc:
         log.exception("AI query failed")
         raise HTTPException(500, "Query failed — check server logs")
+
+
+# ── Raw SQL ──────────────────────────────────────────────────────────────────
+
+class SqlRequest(BaseModel):
+    sql: str = Field(..., min_length=1, max_length=2000)
+
+
+@app.post(
+    "/api/sql",
+    summary="Execute raw SQL (SELECT only)",
+    tags=["Data"],
+)
+async def raw_sql(req: SqlRequest, request: Request) -> dict:
+    """Execute a raw read-only SQL query against the IPL database."""
+    _check_rate_limit(request.client.host)
+
+    if not DATABASE_URL:
+        raise HTTPException(503, "SUPABASE_DATABASE_URL not configured")
+
+    try:
+        df = execute_query(req.sql.strip(), database_url=DATABASE_URL)
+        df = df.where(pd.notnull(df), None)
+        return {
+            "sql":       req.sql.strip(),
+            "columns":   list(df.columns),
+            "rows":      df.values.tolist(),
+            "row_count": len(df),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("raw_sql failed")
+        raise HTTPException(400, str(exc))
 
 
 # ── Live stats ────────────────────────────────────────────────────────────────
