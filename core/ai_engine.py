@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import re
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config import (
     COLUMN_NOTES,
@@ -68,12 +69,17 @@ def generate_sql(
 
     logger.info("Generating SQL for: %.120s", user_question)
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name=model_name)
+    client = genai.Client(api_key=api_key)
     prompt = build_prompt(user_question=user_question, schema=schema)
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0,
+            ),
+        )
         sql = _clean_sql(response.text or "")
     except Exception as exc:
         logger.error("Gemini call failed: %s", exc)
